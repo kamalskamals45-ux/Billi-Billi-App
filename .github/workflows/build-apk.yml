@@ -17,16 +17,48 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.35.0'
           channel: stable
+          cache: true
 
       - name: Flutter version
         run: flutter --version
 
       - name: Create Android project
-        run: flutter create --platforms=android .
+        run: flutter create --platforms=android --project-name billi_billi_video --org com.billibilli .
+
+      - name: Configure Android permissions
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          text = manifest.read_text(encoding="utf-8")
+
+          marker = '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
+
+          permissions = [
+              '    <uses-permission android:name="android.permission.CAMERA" />',
+              '    <uses-permission android:name="android.permission.INTERNET" />',
+          ]
+
+          for permission in permissions:
+              if permission not in text:
+                  text = text.replace(
+                      marker,
+                      marker + "\n" + permission,
+                      1
+                  )
+
+          manifest.write_text(text, encoding="utf-8")
+          PY
 
       - name: Get dependencies
         run: flutter pub get
+
+      - name: Analyze project
+        run: flutter analyze --no-fatal-infos
 
       - name: Build APK
         run: flutter build apk --release
@@ -36,3 +68,4 @@ jobs:
         with:
           name: billi-billi-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
