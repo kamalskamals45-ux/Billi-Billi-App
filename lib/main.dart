@@ -309,13 +309,19 @@ class CreatePage extends StatelessWidget {
             ),
             const SizedBox(height: 30),
             ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: () async {
+                final picker = ImagePicker();
+                await picker.pickVideo(source: ImageSource.gallery);
+                },
               icon: const Icon(Icons.photo_library_outlined),
               label: const Text('Choose from Gallery'),
             ),
             const SizedBox(height: 15),
             ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: () async {
+  final picker = ImagePicker();
+  await picker.pickVideo(source: ImageSource.camera);
+},
               icon: const Icon(Icons.camera_alt_outlined),
               label: const Text('Open Camera'),
             ),
