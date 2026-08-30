@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_player/video_player.dart';
+
 void main() {
   runApp(const BilliBilliApp());
 }
@@ -61,6 +64,7 @@ class _MainScreenState extends State<MainScreen> {
           ),
           NavigationDestination(
             icon: Icon(Icons.search),
+            selectedIcon: Icon(Icons.search),
             label: 'Search',
           ),
           NavigationDestination(
@@ -290,42 +294,162 @@ class SearchPage extends StatelessWidget {
   }
 }
 
-class CreatePage extends StatelessWidget {
+class CreatePage extends StatefulWidget {
   const CreatePage({super.key});
 
   @override
+  State<CreatePage> createState() => _CreatePageState();
+}
+
+class _CreatePageState extends State<CreatePage> {
+  final ImagePicker picker = ImagePicker();
+
+  VideoPlayerController? controller;
+  XFile? selectedVideo;
+  bool loading = false;
+
+  Future<void> pickVideo(ImageSource source) async {
+    try {
+      setState(() {
+        loading = true;
+      });
+
+      final XFile? video = await picker.pickVideo(
+        source: source,
+      );
+
+      if (video == null) {
+        setState(() {
+          loading = false;
+        });
+        return;
+      }
+
+      await controller?.dispose();
+
+      final newController = VideoPlayerController.file(
+        File(video.path),
+      );
+
+      await newController.initialize();
+
+      setState(() {
+        selectedVideo = video;
+        controller = newController;
+        loading = false;
+      });
+
+      await newController.play();
+    } catch (e) {
+      setState(() {
+        loading = false;
+      });
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Video open नहीं हुआ: $e'),
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    controller?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final videoController = controller;
+
     return SafeArea(
       child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'Create',
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.bold,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'Create',
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 30),
-            ElevatedButton.icon(
-              onPressed: () async {
-                final picker = ImagePicker();
-                await picker.pickVideo(source: ImageSource.gallery);
+              const SizedBox(height: 25),
+
+              if (loading)
+                const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: CircularProgressIndicator(),
+                ),
+
+              if (videoController != null &&
+                  videoController.value.isInitialized)
+                Column(
+                  children: [
+                    AspectRatio(
+                      aspectRatio: videoController.value.aspectRatio,
+                      child: VideoPlayer(videoController),
+                    ),
+                    const SizedBox(height: 10),
+                    IconButton(
+                      iconSize: 50,
+                      onPressed: () {
+                        setState(() {
+                          if (videoController.value.isPlaying) {
+                            videoController.pause();
+                          } else {
+                            videoController.play();
+                          }
+                        });
+                      },
+                      icon: Icon(
+                        videoController.value.isPlaying
+                            ? Icons.pause_circle
+                            : Icons.play_circle,
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                  ],
+                ),
+
+              ElevatedButton.icon(
+                onPressed: () {
+                  pickVideo(ImageSource.gallery);
                 },
-              icon: const Icon(Icons.photo_library_outlined),
-              label: const Text('Choose from Gallery'),
-            ),
-            const SizedBox(height: 15),
-            ElevatedButton.icon(
-              onPressed: () async {
-  final picker = ImagePicker();
-  await picker.pickVideo(source: ImageSource.camera);
-},
-              icon: const Icon(Icons.camera_alt_outlined),
-              label: const Text('Open Camera'),
-            ),
-          ],
+                icon: const Icon(
+                  Icons.photo_library_outlined,
+                ),
+                label: const Text('Choose from Gallery'),
+              ),
+
+              const SizedBox(height: 15),
+
+              ElevatedButton.icon(
+                onPressed: () {
+                  pickVideo(ImageSource.camera);
+                },
+                icon: const Icon(
+                  Icons.camera_alt_outlined,
+                ),
+                label: const Text('Open Camera'),
+              ),
+
+              if (selectedVideo != null)
+                Padding(
+                  padding: const EdgeInsets.all(15),
+                  child: Text(
+                    'Video selected successfully',
+                    style: TextStyle(
+                      color: Colors.greenAccent,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
