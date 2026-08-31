@@ -779,8 +779,25 @@ class _CreatePageState extends State<CreatePage> {
                 ),
                 const SizedBox(height: 15),
                 SizedBox(
-                  width: double.infinity,
-                  height: 55,
-                  child: FilledButton.icon(
-                    onPressed: posting ? null : postVideo,
+  width: double.infinity,
+  height: 55,
+  child: FilledButton.icon(
+    onPressed: posting ? null : postVideo,
+    icon: const Icon(Icons.cloud_upload_outlined),
+    label: const Text('Post Video'),
+  ),
+),
+],
+],
+),
+),
+),
+),
+);
+}
+}
+                  
+                  
+                  
+                    
      
