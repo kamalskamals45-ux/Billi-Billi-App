@@ -785,19 +785,13 @@ class _CreatePageState extends State<CreatePage> {
     onPressed: posting ? null : postVideo,
     icon: const Icon(Icons.cloud_upload_outlined),
     label: const Text('Post Video'),
+   ),
   ),
-),
-],
-],
-),
-),
-),
-),
+  ],
+  ),
+  ),
+  ),
+  ),
 );
 }
 }
-                  
-                  
-                  
-                    
-     
