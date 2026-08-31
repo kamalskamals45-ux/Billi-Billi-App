@@ -23,7 +23,7 @@ class BilliBilliApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         useMaterial3: true,
-        colorSchemeSeed: Colors.pink,
+        colorSchemeSeed: Colors.deepPurple,
         scaffoldBackgroundColor: Colors.black,
       ),
       home: const MainScreen(),
@@ -31,7 +31,10 @@ class BilliBilliApp extends StatelessWidget {
   }
 }
 
-enum MediaType { photo, video }
+enum MediaType {
+  photo,
+  video,
+}
 
 class MediaPost {
   MediaPost({
@@ -47,6 +50,7 @@ class MediaPost {
   final String path;
   final MediaType type;
   final String caption;
+
   bool liked;
   bool saved;
   int likes;
@@ -78,14 +82,14 @@ class AppData {
     final Directory root =
         await getApplicationDocumentsDirectory();
 
-    final Directory dir =
+    final Directory directory =
         Directory('${root.path}/billi_billi_media');
 
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
+    if (!await directory.exists()) {
+      await directory.create(recursive: true);
     }
 
-    return dir;
+    return directory;
   }
 
   Future<void> _loadPosts() async {
@@ -103,26 +107,30 @@ class AppData {
         continue;
       }
 
-      final File file = File(parts[0]);
+      try {
+        final File file = File(parts[0]);
 
-      if (!await file.exists()) {
+        if (!await file.exists()) {
+          continue;
+        }
+
+        loaded.add(
+          MediaPost(
+            path: parts[0],
+            type: parts[1] == 'video'
+                ? MediaType.video
+                : MediaType.photo,
+            caption:
+                parts[2].replaceAll(r'\n', '\n'),
+            liked: parts[3] == '1',
+            saved: parts[4] == '1',
+            likes: int.tryParse(parts[5]) ?? 0,
+            comments: int.tryParse(parts[6]) ?? 0,
+          ),
+        );
+      } catch (_) {
         continue;
       }
-
-      loaded.add(
-        MediaPost(
-          path: parts[0],
-          type: parts[1] == 'video'
-              ? MediaType.video
-              : MediaType.photo,
-          caption:
-              parts[2].replaceAll(r'\n', '\n'),
-          liked: parts[3] == '1',
-          saved: parts[4] == '1',
-          likes: int.tryParse(parts[5]) ?? 0,
-          comments: int.tryParse(parts[6]) ?? 0,
-        ),
-      );
     }
 
     posts.value = loaded;
@@ -132,7 +140,7 @@ class AppData {
   Future<void> _savePosts() async {
     final List<String> values =
         posts.value.map((MediaPost post) {
-      final String caption = post.caption
+      final String safeCaption = post.caption
           .replaceAll('|', ' ')
           .replaceAll('\n', r'\n');
 
@@ -141,7 +149,7 @@ class AppData {
         post.type == MediaType.video
             ? 'video'
             : 'photo',
-        caption,
+        safeCaption,
         post.liked ? '1' : '0',
         post.saved ? '1' : '0',
         '${post.likes}',
@@ -173,21 +181,24 @@ class AppData {
         return null;
       }
 
-      final Directory dir =
+      final Directory directory =
           await _mediaDirectory();
 
-      final String extension =
-          sourcePath.contains('.')
-              ? sourcePath.split('.').last.toLowerCase()
-              : 'mp4';
+      String extension = 'mp4';
+
+      if (sourcePath.contains('.')) {
+        extension =
+            sourcePath.split('.').last.toLowerCase();
+      }
 
       final String fileName =
           'billi_${DateTime.now().millisecondsSinceEpoch}.$extension';
 
-      final File saved =
-          await source.copy('${dir.path}/$fileName');
+      final File destination = await source.copy(
+        '${directory.path}/$fileName',
+      );
 
-      return saved.path;
+      return destination.path;
     } catch (_) {
       return null;
     }
@@ -198,12 +209,14 @@ class AppData {
     required MediaType type,
     String caption = '',
   }) async {
+    final MediaPost newPost = MediaPost(
+      path: path,
+      type: type,
+      caption: caption.trim(),
+    );
+
     posts.value = <MediaPost>[
-      MediaPost(
-        path: path,
-        type: type,
-        caption: caption,
-      ),
+      newPost,
       ...posts.value,
     ];
 
@@ -302,8 +315,7 @@ class _MainScreenState
 
   @override
   Widget build(BuildContext context) {
-    final List<Widget> pages =
-        <Widget>[
+    final List<Widget> pages = <Widget>[
       const HomePage(),
       const SearchPage(),
       const CreatePage(),
@@ -320,8 +332,7 @@ class _MainScreenState
         backgroundColor: Colors.black,
         indicatorColor: Colors.white12,
         selectedIndex: currentIndex,
-        onDestinationSelected:
-            (int index) {
+        onDestinationSelected: (int index) {
           setState(() {
             currentIndex = index;
           });
@@ -365,13 +376,11 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: ValueListenableBuilder<
-          List<MediaPost>>(
-        valueListenable:
-            AppData.instance.posts,
+      child: ValueListenableBuilder<List<MediaPost>>(
+        valueListenable: AppData.instance.posts,
         builder: (
           BuildContext context,
-          List<MediaPost> posts,
+          List<MediaPost> items,
           Widget? child,
         ) {
           return CustomScrollView(
@@ -420,7 +429,7 @@ class HomePage extends StatelessWidget {
               const SliverToBoxAdapter(
                 child: StoriesSection(),
               ),
-              if (posts.isEmpty)
+              if (items.isEmpty)
                 const SliverFillRemaining(
                   hasScrollBody: false,
                   child: Center(
@@ -468,10 +477,10 @@ class HomePage extends StatelessWidget {
                       int index,
                     ) {
                       return MediaPostCard(
-                        post: posts[index],
+                        post: items[index],
                       );
                     },
-                    childCount: posts.length,
+                    childCount: items.length,
                   ),
                 ),
             ],
@@ -488,11 +497,10 @@ class StoriesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 108,
+      height: 115,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        padding:
-            const EdgeInsets.symmetric(
+        padding: const EdgeInsets.symmetric(
           horizontal: 12,
         ),
         itemCount: 8,
@@ -508,17 +516,19 @@ class StoriesSection extends StatelessWidget {
                 CircleAvatar(
                   radius: 32,
                   backgroundColor:
-                      Colors.white24,
+                      Colors.deepPurple.shade700,
                   child: index == 0
                       ? const Icon(
                           Icons.add,
                           size: 30,
                         )
                       : Text(
-                          '${index + 1}',
+                          '$index',
                           style:
                               const TextStyle(
                             fontSize: 20,
+                            fontWeight:
+                                FontWeight.bold,
                           ),
                         ),
                 ),
@@ -526,7 +536,7 @@ class StoriesSection extends StatelessWidget {
                 Text(
                   index == 0
                       ? 'Your story'
-                      : 'User ${index + 1}',
+                      : 'User $index',
                   style:
                       const TextStyle(fontSize: 11),
                 ),
@@ -579,11 +589,14 @@ class _MediaPostCardState
               if (value == 'delete') {
                 await AppData.instance
                     .deletePost(post);
+
+                if (mounted) {
+                  setState(() {});
+                }
               }
             },
-            itemBuilder: (
-              BuildContext context,
-            ) {
+            itemBuilder:
+                (BuildContext context) {
               return const <PopupMenuEntry<String>>[
                 PopupMenuItem<String>(
                   value: 'delete',
@@ -678,8 +691,7 @@ class _MediaPostCardState
           ],
         ),
         Padding(
-          padding:
-              const EdgeInsets.fromLTRB(
+          padding: const EdgeInsets.fromLTRB(
             16,
             0,
             16,
@@ -764,7 +776,9 @@ class _MediaPostCardState
       ClipboardData(text: widget.post.path),
     );
 
-    if (!context.mounted) return;
+    if (!context.mounted) {
+      return;
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -789,8 +803,7 @@ class VideoPost extends StatefulWidget {
       _VideoPostState();
 }
 
-class _VideoPostState
-    extends State<VideoPost> {
+class _VideoPostState extends State<VideoPost> {
   VideoPlayerController? controller;
   bool loading = true;
   bool error = false;
@@ -806,12 +819,15 @@ class _VideoPostState
       final File file = File(widget.path);
 
       if (!await file.exists()) {
-        if (mounted) {
-          setState(() {
-            loading = false;
-            error = true;
-          });
+        if (!mounted) {
+          return;
         }
+
+        setState(() {
+          loading = false;
+          error = true;
+        });
+
         return;
       }
 
@@ -819,6 +835,7 @@ class _VideoPostState
           VideoPlayerController.file(file);
 
       await newController.initialize();
+      await newController.setLooping(true);
 
       if (!mounted) {
         await newController.dispose();
@@ -829,8 +846,12 @@ class _VideoPostState
         controller = newController;
         loading = false;
       });
+
+      await newController.play();
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         loading = false;
@@ -852,7 +873,7 @@ class _VideoPostState
 
     if (loading) {
       return const AspectRatio(
-        aspectRatio: 9 / 16,
+        aspectRatio: 16 / 9,
         child: Center(
           child: CircularProgressIndicator(),
         ),
@@ -863,9 +884,9 @@ class _VideoPostState
         video == null ||
         !video.value.isInitialized) {
       return const SizedBox(
-        height: 350,
+        height: 300,
         child: Center(
-          child: Text('वीडियो चल नहीं पाया'),
+          child: Text('वीडियो उपलब्ध नहीं है'),
         ),
       );
     }
@@ -880,32 +901,9 @@ class _VideoPostState
           }
         });
       },
-      child: Stack(
-        alignment: Alignment.center,
-        children: <Widget>[
-          AspectRatio(
-            aspectRatio:
-                video.value.aspectRatio,
-            child: VideoPlayer(video),
-          ),
-          if (!video.value.isPlaying)
-            const CircleAvatar(
-              radius: 30,
-              child: Icon(
-                Icons.play_arrow,
-                size: 38,
-              ),
-            ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: VideoProgressIndicator(
-              video,
-              allowScrubbing: true,
-            ),
-          ),
-        ],
+      child: AspectRatio(
+        aspectRatio: video.value.aspectRatio,
+        child: VideoPlayer(video),
       ),
     );
   }
@@ -925,76 +923,83 @@ class _SearchPageState
       TextEditingController();
 
   @override
-  void initState() {
-    super.initState();
-    controller.addListener(_search);
-  }
-
-  void _search() {
-    AppData.instance.searchText.value =
-        controller.text;
-    setState(() {});
-  }
-
-  @override
   void dispose() {
     controller.dispose();
+    AppData.instance.searchText.value = '';
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final List<MediaPost> results =
-        AppData.instance.filteredPosts();
-
     return SafeArea(
       child: Column(
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.all(15),
+            padding: const EdgeInsets.all(16),
             child: TextField(
               controller: controller,
+              onChanged: (String value) {
+                AppData.instance.searchText.value =
+                    value;
+                setState(() {});
+              },
               decoration: InputDecoration(
-                hintText:
-                    'Search people, videos, hashtags...',
+                hintText: 'Search Billi Billi...',
                 prefixIcon:
                     const Icon(Icons.search),
-                suffixIcon:
-                    controller.text.isEmpty
-                        ? null
-                        : IconButton(
-                            onPressed:
-                                controller.clear,
-                            icon: const Icon(
-                              Icons.clear,
-                            ),
-                          ),
-                border:
-                    const OutlineInputBorder(),
+                suffixIcon: controller.text.isEmpty
+                    ? null
+                    : IconButton(
+                        onPressed: () {
+                          controller.clear();
+                          AppData.instance
+                              .searchText.value = '';
+                          setState(() {});
+                        },
+                        icon:
+                            const Icon(Icons.clear),
+                      ),
+                border: const OutlineInputBorder(),
               ),
             ),
           ),
           Expanded(
-            child: results.isEmpty
-                ? const Center(
+            child: ValueListenableBuilder<
+                List<MediaPost>>(
+              valueListenable:
+                  AppData.instance.posts,
+              builder: (
+                BuildContext context,
+                List<MediaPost> items,
+                Widget? child,
+              ) {
+                final List<MediaPost> filtered =
+                    AppData.instance.filteredPosts();
+
+                if (filtered.isEmpty) {
+                  return const Center(
                     child: Text(
                       'कोई पोस्ट नहीं मिली',
-                      style: TextStyle(
-                        fontSize: 20,
-                      ),
                     ),
-                  )
-                : ListView.builder(
-                    itemCount: results.length,
-                    itemBuilder: (
-                      BuildContext context,
-                      int index,
-                    ) {
-                      return MediaPostCard(
-                        post: results[index],
-                      );
-                    },
-                  ),
+                  );
+                }
+
+                return ListView.builder(
+                  itemCount: filtered.length,
+                  itemBuilder: (
+                    BuildContext context,
+                    int index,
+                  ) {
+                    final MediaPost post =
+                        filtered[index];
+
+                    return MediaPostCard(
+                      post: post,
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -1012,133 +1017,145 @@ class CreatePage extends StatefulWidget {
 
 class _CreatePageState
     extends State<CreatePage> {
-  final ImagePicker picker =
-      ImagePicker();
+  final ImagePicker picker = ImagePicker();
 
-  VideoPlayerController? videoController;
+  XFile? selectedFile;
+  MediaType? selectedType;
 
-  XFile? selectedVideo;
-  XFile? selectedPhoto;
+  VideoPlayerController? previewController;
 
-  bool loading = false;
-  bool posting = false;
+  final TextEditingController captionController =
+      TextEditingController();
 
-  Future<void> pickVideo(
-    ImageSource source,
-  ) async {
-    if (loading || posting) return;
+  bool saving = false;
 
-    setState(() {
-      loading = true;
-    });
+  @override
+  void dispose() {
+    previewController?.dispose();
+    captionController.dispose();
+    super.dispose();
+  }
 
+  Future<void> _pickGallery() async {
     try {
-      final XFile? video =
+      final XFile? file =
+          await picker.pickMedia();
+
+      if (file == null) {
+        return;
+      }
+
+      await _setSelectedFile(file);
+    } catch (e) {
+      _showMessage(
+        'Gallery से media चुनने में समस्या हुई।',
+      );
+    }
+  }
+
+  Future<void> _pickVideoCamera() async {
+    try {
+      final XFile? file =
           await picker.pickVideo(
-        source: source,
-        maxDuration:
-            const Duration(minutes: 5),
+        source: ImageSource.camera,
       );
 
-      if (video == null) {
-        if (mounted) {
-          setState(() {
-            loading = false;
-          });
-        }
+      if (file == null) {
         return;
       }
 
-      final VideoPlayerController newController =
-          VideoPlayerController.file(
-        File(video.path),
+      await _setSelectedFile(
+        file,
+        forceVideo: true,
       );
-
-      await newController.initialize();
-      await videoController?.dispose();
-
-      if (!mounted) {
-        await newController.dispose();
-        return;
-      }
-
-      setState(() {
-        selectedVideo = video;
-        selectedPhoto = null;
-        videoController = newController;
-        loading = false;
-      });
-
-      await newController.play();
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        loading = false;
-      });
-
+    } catch (_) {
       _showMessage(
-        'वीडियो open नहीं हुआ: $e',
+        'Camera से वीडियो बनाने में समस्या हुई।',
       );
     }
   }
 
-  Future<void> pickPhoto(
-    ImageSource source,
-  ) async {
-    if (loading || posting) return;
+  Future<void> _pickPhotoCamera() async {
+    try {
+      final XFile? file =
+          await picker.pickImage(
+        source: ImageSource.camera,
+      );
+
+      if (file == null) {
+        return;
+      }
+
+      await _setSelectedFile(
+        file,
+        forcePhoto: true,
+      );
+    } catch (_) {
+      _showMessage(
+        'Camera से फोटो लेने में समस्या हुई।',
+      );
+    }
+  }
+
+  Future<void> _setSelectedFile(
+    XFile file, {
+    bool forceVideo = false,
+    bool forcePhoto = false,
+  }) async {
+    await previewController?.dispose();
+    previewController = null;
+
+    MediaType type;
+
+    if (forceVideo) {
+      type = MediaType.video;
+    } else if (forcePhoto) {
+      type = MediaType.photo;
+    } else {
+      final String name =
+          file.name.toLowerCase();
+
+      final bool isVideo =
+          name.endsWith('.mp4') ||
+              name.endsWith('.mov') ||
+              name.endsWith('.avi') ||
+              name.endsWith('.mkv') ||
+              name.endsWith('.webm');
+
+      type = isVideo
+          ? MediaType.video
+          : MediaType.photo;
+    }
+
+    if (type == MediaType.video) {
+      try {
+        final VideoPlayerController video =
+            VideoPlayerController.file(
+          File(file.path),
+        );
+
+        await video.initialize();
+        await video.setLooping(true);
+
+        previewController = video;
+      } catch (_) {
+        previewController = null;
+      }
+    }
+
+    if (!mounted) {
+      return;
+    }
 
     setState(() {
-      loading = true;
+      selectedFile = file;
+      selectedType = type;
     });
-
-    try {
-      final XFile? photo =
-          await picker.pickImage(
-        source: source,
-        imageQuality: 90,
-        maxWidth: 1800,
-      );
-
-      if (photo == null) {
-        if (mounted) {
-          setState(() {
-            loading = false;
-          });
-        }
-        return;
-      }
-
-      await videoController?.dispose();
-
-      if (!mounted) return;
-
-      setState(() {
-        selectedPhoto = photo;
-        selectedVideo = null;
-        videoController = null;
-        loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        loading = false;
-      });
-
-      _showMessage(
-        'फोटो open नहीं हुई: $e',
-      );
-    }
   }
 
-  Future<void> postMedia() async {
-    if (posting) return;
-
-    final XFile? video = selectedVideo;
-    final XFile? photo = selectedPhoto;
-
-    if (video == null && photo == null) {
+  Future<void> _publish() async {
+    if (selectedFile == null ||
+        selectedType == null) {
       _showMessage(
         'पहले फोटो या वीडियो चुनें।',
       );
@@ -1146,59 +1163,59 @@ class _CreatePageState
     }
 
     setState(() {
-      posting = true;
+      saving = true;
     });
 
-    final String sourcePath =
-        video?.path ?? photo!.path;
-
     final String? savedPath =
-        await AppData.instance
-            .copyMediaToAppFolder(
-      sourcePath,
+        await AppData.instance.copyMediaToAppFolder(
+      selectedFile!.path,
     );
 
     if (savedPath == null) {
       if (mounted) {
         setState(() {
-          posting = false;
+          saving = false;
         });
 
         _showMessage(
-          'मीडिया सेव नहीं हो पाया।',
+          'Media save नहीं हो सका।',
         );
       }
+
       return;
     }
 
     await AppData.instance.addPost(
       path: savedPath,
-      type: video != null
-          ? MediaType.video
-          : MediaType.photo,
+      type: selectedType!,
+      caption: captionController.text,
     );
 
-    await videoController?.dispose();
-
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
     setState(() {
-      videoController = null;
-      selectedVideo = null;
-      selectedPhoto = null;
-      posting = false;
+      saving = false;
+      selectedFile = null;
+      selectedType = null;
     });
 
+    await previewController?.dispose();
+    previewController = null;
+    captionController.clear();
+
     _showMessage(
-      'पोस्ट सफलतापूर्वक सेव हो गई ✅',
+      'Post successfully publish हो गई ✅',
     );
   }
 
   void _showMessage(String message) {
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
       ),
@@ -1206,191 +1223,189 @@ class _CreatePageState
   }
 
   @override
-  void dispose() {
-    videoController?.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final VideoPlayerController? video =
-        videoController;
-
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: <Widget>[
+            const SizedBox(height: 10),
             const Text(
               'Create',
               style: TextStyle(
-                fontSize: 30,
+                fontSize: 28,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Billi Billi पर फोटो और वीडियो बनाएं',
-              style: TextStyle(
-                color: Colors.white70,
-              ),
-            ),
-            const SizedBox(height: 24),
-            if (loading)
-              const CircularProgressIndicator(),
-            if (selectedPhoto != null)
-              Padding(
-                padding:
-                    const EdgeInsets.only(
-                  bottom: 15,
-                ),
-                child: ClipRRect(
-                  borderRadius:
-                      BorderRadius.circular(14),
-                  child: Image.file(
-                    File(selectedPhoto!.path),
-                    height: 330,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-            if (video != null &&
-                video.value.isInitialized)
-              Column(
-                children: <Widget>[
-                  ClipRRect(
-                    borderRadius:
-                        BorderRadius.circular(14),
-                    child: AspectRatio(
-                      aspectRatio:
-                          video.value.aspectRatio,
-                      child: VideoPlayer(video),
-                    ),
-                  ),
-                  IconButton(
-                    iconSize: 55,
-                    onPressed: () {
-                      setState(() {
-                        if (video.value.isPlaying) {
-                          video.pause();
-                        } else {
-                          video.play();
-                        }
-                      });
-                    },
-                    icon: Icon(
-                      video.value.isPlaying
-                          ? Icons.pause_circle
-                          : Icons.play_circle,
-                    ),
-                  ),
-                ],
-              ),
-            const SizedBox(height: 15),
-            _CreateButton(
-              icon:
-                  Icons.video_library_outlined,
-              text:
-                  'Gallery से वीडियो चुनें',
-              onPressed:
-                  loading || posting
-                      ? null
-                      : () => pickVideo(
-                            ImageSource.gallery,
-                          ),
-            ),
-            const SizedBox(height: 12),
-            _CreateButton(
-              icon:
-                  Icons.videocam_outlined,
-              text:
-                  'Camera से वीडियो रिकॉर्ड करें',
-              onPressed:
-                  loading || posting
-                      ? null
-                      : () => pickVideo(
-                            ImageSource.camera,
-                          ),
-            ),
-            const SizedBox(height: 12),
-            _CreateButton(
-              icon:
+            const SizedBox(height: 20),
+            _preview(),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed:
+                    saving ? null : _pickGallery,
+                icon: const Icon(
                   Icons.photo_library_outlined,
-              text:
-                  'Gallery से फोटो चुनें',
-              onPressed:
-                  loading || posting
-                      ? null
-                      : () => pickPhoto(
-                            ImageSource.gallery,
-                          ),
-            ),
-            const SizedBox(height: 12),
-            _CreateButton(
-              icon:
-                  Icons.camera_alt_outlined,
-              text: 'Camera से फोटो लें',
-              onPressed:
-                  loading || posting
-                      ? null
-                      : () => pickPhoto(
-                            ImageSource.camera,
-                          ),
-            ),
-            if (selectedVideo != null ||
-                selectedPhoto != null)
-              Padding(
-                padding:
-                    const EdgeInsets.only(
-                  top: 20,
                 ),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 55,
-                  child: FilledButton.icon(
-                    onPressed:
-                        loading || posting
-                            ? null
-                            : postMedia,
-                    icon: const Icon(
-                      Icons.cloud_upload_outlined,
-                    ),
-                    label: Text(
-                      posting
-                          ? 'Posting...'
-                          : 'Post करें',
-                    ),
-                  ),
+                label: const Text(
+                  'Choose from Gallery',
                 ),
               ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: saving
+                        ? null
+                        : _pickVideoCamera,
+                    icon: const Icon(
+                      Icons.videocam_outlined,
+                    ),
+                    label: const Text('Video'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: saving
+                        ? null
+                        : _pickPhotoCamera,
+                    icon: const Icon(
+                      Icons.camera_alt_outlined,
+                    ),
+                    label: const Text('Photo'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: captionController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText:
+                    'Caption लिखें...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: FilledButton.icon(
+                onPressed:
+                    saving ? null : _publish,
+                icon: saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child:
+                            CircularProgressIndicator(
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.publish,
+                      ),
+                label: Text(
+                  saving
+                      ? 'Publishing...'
+                      : 'Publish',
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
-}
 
-class _CreateButton
-    extends StatelessWidget {
-  const _CreateButton({
-    required this.icon,
-    required this.text,
-    required this.onPressed,
-  });
+  Widget _preview() {
+    if (selectedFile == null) {
+      return Container(
+        height: 330,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white10,
+          borderRadius:
+              BorderRadius.circular(20),
+        ),
+        child: const Column(
+          mainAxisAlignment:
+              MainAxisAlignment.center,
+          children: <Widget>[
+            Icon(
+              Icons.perm_media_outlined,
+              size: 80,
+              color: Colors.white38,
+            ),
+            SizedBox(height: 15),
+            Text(
+              'अपना फोटो या वीडियो चुनें',
+            ),
+          ],
+        ),
+      );
+    }
 
-  final IconData icon;
-  final String text;
-  final VoidCallback? onPressed;
+    if (selectedType == MediaType.photo) {
+      return ClipRRect(
+        borderRadius:
+            BorderRadius.circular(20),
+        child: Image.file(
+          File(selectedFile!.path),
+          width: double.infinity,
+          height: 330,
+          fit: BoxFit.cover,
+          errorBuilder: (
+            BuildContext context,
+            Object error,
+            StackTrace? stackTrace,
+          ) {
+            return const SizedBox(
+              height: 330,
+              child: Center(
+                child:
+                    Text('Preview उपलब्ध नहीं है'),
+              ),
+            );
+          },
+        ),
+      );
+    }
 
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon),
-        label: Text(text),
+    final VideoPlayerController? video =
+        previewController;
+
+    if (video == null ||
+        !video.value.isInitialized) {
+      return Container(
+        height: 330,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white10,
+          borderRadius:
+              BorderRadius.circular(20),
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (!video.value.isPlaying) {
+      video.play();
+    }
+
+    return ClipRRect(
+      borderRadius:
+          BorderRadius.circular(20),
+      child: AspectRatio(
+        aspectRatio: video.value.aspectRatio,
+        child: VideoPlayer(video),
       ),
     );
   }
@@ -1424,11 +1439,11 @@ class _ReelsPageState
             AppData.instance.posts,
         builder: (
           BuildContext context,
-          List<MediaPost> posts,
+          List<MediaPost> items,
           Widget? child,
         ) {
           final List<MediaPost> videos =
-              posts
+              items
                   .where(
                     (MediaPost post) =>
                         post.type ==
@@ -1486,7 +1501,6 @@ class _ReelsPageState
     );
   }
 }
-
 class ReelItem extends StatefulWidget {
   const ReelItem({
     super.key,
@@ -1518,34 +1532,40 @@ class _ReelItemState
           File(widget.post.path);
 
       if (!await file.exists()) {
-        if (mounted) {
-          setState(() {
-            loading = false;
-            error = true;
-          });
+        if (!mounted) {
+          return;
         }
+
+        setState(() {
+          loading = false;
+          error = true;
+        });
+
         return;
       }
 
-      final VideoPlayerController newController =
+      final VideoPlayerController video =
           VideoPlayerController.file(file);
 
-      await newController.initialize();
-      await newController.setLooping(true);
+      await video.initialize();
+      await video.setLooping(true);
 
       if (!mounted) {
-        await newController.dispose();
+        await video.dispose();
         return;
       }
 
+      controller = video;
+
       setState(() {
-        controller = newController;
         loading = false;
       });
 
-      await newController.play();
+      await video.play();
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         loading = false;
@@ -1581,20 +1601,20 @@ class _ReelItemState
       );
     }
 
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          if (video.value.isPlaying) {
-            video.pause();
-          } else {
-            video.play();
-          }
-        });
-      },
-      child: Stack(
-        fit: StackFit.expand,
-        children: <Widget>[
-          FittedBox(
+    return Stack(
+      fit: StackFit.expand,
+      children: <Widget>[
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              if (video.value.isPlaying) {
+                video.pause();
+              } else {
+                video.play();
+              }
+            });
+          },
+          child: FittedBox(
             fit: BoxFit.cover,
             child: SizedBox(
               width: video.value.size.width,
@@ -1602,87 +1622,185 @@ class _ReelItemState
               child: VideoPlayer(video),
             ),
           ),
-          if (!video.value.isPlaying)
-            const Center(
-              child: CircleAvatar(
-                radius: 30,
-                child: Icon(
-                  Icons.play_arrow,
-                  size: 38,
+        ),
+        Positioned(
+          right: 10,
+          bottom: 90,
+          child: Column(
+            children: <Widget>[
+              IconButton(
+                onPressed: () async {
+                  await AppData.instance
+                      .toggleLike(widget.post);
+
+                  if (mounted) {
+                    setState(() {});
+                  }
+                },
+                iconSize: 36,
+                icon: Icon(
+                  widget.post.liked
+                      ? Icons.favorite
+                      : Icons.favorite_border,
+                  color: widget.post.liked
+                      ? Colors.red
+                      : Colors.white,
                 ),
               ),
-            ),
-          Positioned(
-            right: 12,
-            bottom: 90,
-            child: Column(
-              children: <Widget>[
-                IconButton(
-                  onPressed: () async {
-                    await AppData.instance
-                        .toggleLike(widget.post);
+              Text(
+                '${widget.post.likes}',
+              ),
+              const SizedBox(height: 12),
+              IconButton(
+                onPressed: () {
+                  _showCommentBox(context);
+                },
+                iconSize: 32,
+                icon: const Icon(
+                  Icons.comment_outlined,
+                ),
+              ),
+              Text(
+                '${widget.post.comments}',
+              ),
+              const SizedBox(height: 12),
+              IconButton(
+                onPressed: () async {
+                  await AppData.instance
+                      .toggleSave(widget.post);
 
-                    if (mounted) {
-                      setState(() {});
-                    }
-                  },
-                  iconSize: 34,
-                  icon: Icon(
-                    widget.post.liked
-                        ? Icons.favorite
-                        : Icons.favorite_border,
-                    color: widget.post.liked
-                        ? Colors.red
-                        : Colors.white,
-                  ),
+                  if (mounted) {
+                    setState(() {});
+                  }
+                },
+                iconSize: 32,
+                icon: Icon(
+                  widget.post.saved
+                      ? Icons.bookmark
+                      : Icons.bookmark_border,
                 ),
-                Text(
-                  '${widget.post.likes}',
+              ),
+              const SizedBox(height: 12),
+              IconButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(
+                    const SnackBar(
+                      content:
+                          Text('वीडियो शेयर करें'),
+                    ),
+                  );
+                },
+                iconSize: 32,
+                icon: const Icon(
+                  Icons.share_outlined,
                 ),
-                const SizedBox(height: 10),
-                IconButton(
+              ),
+            ],
+          ),
+        ),
+        Positioned(
+          left: 16,
+          right: 80,
+          bottom: 25,
+          child: Text(
+            widget.post.caption.isEmpty
+                ? 'Billi Billi Reel'
+                : widget.post.caption,
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showCommentBox(
+    BuildContext context,
+  ) async {
+    final TextEditingController controller =
+        TextEditingController();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor:
+          Colors.grey.shade900,
+      builder: (
+        BuildContext sheetContext,
+      ) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 20,
+            bottom:
+                MediaQuery.of(sheetContext)
+                        .viewInsets
+                        .bottom +
+                    20,
+          ),
+          child: Column(
+            mainAxisSize:
+                MainAxisSize.min,
+            children: <Widget>[
+              const Text(
+                'कमेंट करें',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight:
+                      FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 15),
+              TextField(
+                controller: controller,
+                maxLines: 3,
+                decoration:
+                    const InputDecoration(
+                  hintText:
+                      'अपना कमेंट लिखें...',
+                  border:
+                      OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
                   onPressed: () async {
+                    if (controller.text
+                        .trim()
+                        .isEmpty) {
+                      return;
+                    }
+
                     await AppData.instance
                         .addComment(widget.post);
 
+                    if (sheetContext.mounted) {
+                      Navigator.pop(
+                        sheetContext,
+                      );
+                    }
+
                     if (mounted) {
                       setState(() {});
                     }
                   },
-                  iconSize: 32,
-                  icon:  const Icon(
-                    Icons.share_outlined,
-                  ),
+                  child:
+                      const Text('पोस्ट करें'),
                 ),
-              ],
-            ),
-          ),
-          Positioned(
-            left: 15,
-            right: 80,
-            bottom: 25,
-            child: Text(
-              widget.post.caption.isEmpty
-                  ? 'Billi Billi Reel\n#BilliBilli #Shorts'
-                  : '${widget.post.caption}\n#BilliBilli #Shorts',
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
               ),
-            ),
+            ],
           ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: VideoProgressIndicator(
-              video,
-              allowScrubbing: false,
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
+
+    controller.dispose();
   }
 }
 
@@ -1717,8 +1835,9 @@ class _ProfilePageState
         BuildContext dialogContext,
       ) {
         return AlertDialog(
-          title:
-              const Text('प्रोफाइल एडिट करें'),
+          title: const Text(
+            'प्रोफाइल एडिट करें',
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
@@ -1729,8 +1848,10 @@ class _ProfilePageState
                   labelText: 'नाम',
                 ),
               ),
+              const SizedBox(height: 10),
               TextField(
                 controller: bioController,
+                maxLines: 3,
                 decoration:
                     const InputDecoration(
                   labelText: 'Bio',
@@ -1741,7 +1862,9 @@ class _ProfilePageState
           actions: <Widget>[
             TextButton(
               onPressed: () {
-                Navigator.pop(dialogContext);
+                Navigator.pop(
+                  dialogContext,
+                );
               },
               child:
                   const Text('रद्द करें'),
@@ -1749,18 +1872,21 @@ class _ProfilePageState
             FilledButton(
               onPressed: () {
                 setState(() {
-                  username = nameController
-                          .text
-                          .trim()
-                          .isEmpty
-                      ? 'Billi Billi User'
-                      : nameController.text
-                          .trim();
+                  username =
+                      nameController.text
+                              .trim()
+                              .isEmpty
+                          ? 'Billi Billi User'
+                          : nameController.text
+                              .trim();
 
-                  bio = bioController.text.trim();
+                  bio = bioController.text
+                      .trim();
                 });
 
-                Navigator.pop(dialogContext);
+                Navigator.pop(
+                  dialogContext,
+                );
               },
               child: const Text('सेव'),
             ),
@@ -1773,45 +1899,132 @@ class _ProfilePageState
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: ValueListenableBuilder<
-          List<MediaPost>>(
-        valueListenable:
-            AppData.instance.posts,
-        builder: (
-          BuildContext context,
-          List<MediaPost> posts,
-          Widget? child,
-        ) {
-          final int videos = posts
-              .where(
-                (MediaPost post) =>
-                    post.type ==
-                    MediaType.video,
-              )
-              .length;
-
-          final int photos = posts
-              .where(
-                (MediaPost post) =>
-                    post.type ==
-                    MediaType.photo,
-              )
-              .length;
-
-          return CustomScrollView(
-            slivers: <Widget>[
-              SliverAppBar(
-                pinned: true,
-                title: Text(username),
-                actions: <Widget>[
-                  IconButton(
-                    onPressed: _editProfile,
-                    icon: const Icon(
-                      Icons.edit_outlined,
+      child: Column(
+        children: <Widget>[
+          Expanded(
+            child: SingleChildScrollView(
+              padding:
+                  const EdgeInsets.all(20),
+              child: Column(
+                children: <Widget>[
+                  const SizedBox(height: 20),
+                  const CircleAvatar(
+                    radius: 70,
+                    backgroundColor:
+                        Colors.deepPurple,
+                    child: Icon(
+                      Icons.person,
+                      size: 75,
+                      color: Colors.white,
                     ),
                   ),
-                  IconButton(
-                    onPressed: () {
+                  const SizedBox(height: 18),
+                  Text(
+                    username,
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight:
+                          FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    '@billi_billi_user',
+                    style: TextStyle(
+                      fontSize: 17,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  Text(
+                    bio,
+                    textAlign: TextAlign.center,
+                    style:
+                        const TextStyle(
+                      fontSize: 15,
+                      color:
+                          Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(height: 25),
+                  ValueListenableBuilder<
+                      List<MediaPost>>(
+                    valueListenable:
+                        AppData.instance.posts,
+                    builder: (
+                      BuildContext context,
+                      List<MediaPost> posts,
+                      Widget? child,
+                    ) {
+                      return Row(
+                        mainAxisAlignment:
+                            MainAxisAlignment
+                                .spaceEvenly,
+                        children: <Widget>[
+                          _stat(
+                            '${posts.length}',
+                            'Posts',
+                          ),
+                          _stat(
+                            '0',
+                            'Followers',
+                          ),
+                          _stat(
+                            '0',
+                            'Following',
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 25),
+                  OutlinedButton(
+                    onPressed:
+                        _editProfile,
+                    style:
+                        OutlinedButton.styleFrom(
+                      padding:
+                          const EdgeInsets
+                              .symmetric(
+                        horizontal: 35,
+                        vertical: 14,
+                      ),
+                    ),
+                    child: const Text(
+                      'Edit Profile',
+                      style:
+                          TextStyle(
+                        fontSize: 17,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 25),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.bookmark_outline,
+                    ),
+                    title:
+                        const Text('Saved Posts'),
+                    trailing: const Icon(
+                      Icons.chevron_right,
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const SavedPage(),
+                        ),
+                      );
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.settings_outlined,
+                    ),
+                    title:
+                        const Text('Settings'),
+                    onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -1820,192 +2033,69 @@ class _ProfilePageState
                         ),
                       );
                     },
-                    icon: const Icon(
-                      Icons.settings_outlined,
+                  ),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.language,
                     ),
+                    title:
+                        const Text('Language'),
+                    subtitle: const Text(
+                      'Hindi / English',
+                    ),
+                  ),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.info_outline,
+                    ),
+                    title:
+                        const Text(
+                      'About Billi Billi',
+                    ),
+                    subtitle:
+                        const Text(
+                      'Version 1.0.0',
+                    ),
+                    onTap: () {
+                      showAboutDialog(
+                        context: context,
+                        applicationName:
+                            'Billi Billi',
+                        applicationVersion:
+                            '1.0.0',
+                        applicationLegalese:
+                            'Billi Billi Video Sharing App',
+                      );
+                    },
                   ),
                 ],
               ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding:
-                      const EdgeInsets.all(20),
-                  child: Column(
-                    children: <Widget>[
-                      const CircleAvatar(
-                        radius: 50,
-                        child: Icon(
-                          Icons.person,
-                          size: 55,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        username,
-                        style:
-                            const TextStyle(
-                          fontSize: 22,
-                          fontWeight:
-                              FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        bio,
-                        textAlign:
-                            TextAlign.center,
-                        style:
-                            const TextStyle(
-                          color: Colors.white70,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment
-                                .spaceEvenly,
-                        children: <Widget>[
-                          _ProfileStat(
-                            value:
-                                '${posts.length}',
-                            label: 'Posts',
-                          ),
-                          _ProfileStat(
-                            value: '$videos',
-                            label: 'Videos',
-                          ),
-                          _ProfileStat(
-                            value: '$photos',
-                            label: 'Photos',
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton(
-                          onPressed:
-                              _editProfile,
-                          child: const Text(
-                            'प्रोफाइल एडिट करें',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const SavedPage(),
-                              ),
-                            );
-                          },
-                          icon: const Icon(
-                            Icons.bookmark_border,
-                          ),
-                          label: const Text(
-                            'Saved Posts',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              if (posts.isEmpty)
-                const SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(
-                    child: Text(
-                      'आपकी पोस्ट यहां दिखाई देंगी।',
-                    ),
-                  ),
-                )
-              else
-                SliverGrid(
-                  delegate:
-                      SliverChildBuilderDelegate(
-                    (
-                      BuildContext context,
-                      int index,
-                    ) {
-                      final MediaPost post =
-                          posts[index];
-
-                      if (post.type ==
-                          MediaType.photo) {
-                        return Image.file(
-                          File(post.path),
-                          fit: BoxFit.cover,
-                          errorBuilder: (
-                            BuildContext context,
-                            Object error,
-                            StackTrace? stackTrace,
-                          ) {
-                            return const Icon(
-                              Icons.broken_image,
-                            );
-                          },
-                        );
-                      }
-
-                      return const ColoredBox(
-                        color: Colors.white12,
-                        child: Center(
-                          child: Icon(
-                            Icons.play_circle,
-                            size: 42,
-                          ),
-                        ),
-                      );
-                    },
-                    childCount: posts.length,
-                  ),
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 2,
-                    mainAxisSpacing: 2,
-                  ),
-                ),
-            ],
-          );
-        },
+            ),
+          ),
+        ],
       ),
     );
   }
-}
 
-class _ProfileStat
-    extends StatelessWidget {
-  const _ProfileStat({
-    required this.value,
-    required this.label,
-  });
-
-  final String value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _stat(
+    String number,
+    String label,
+  ) {
     return Column(
       children: <Widget>[
         Text(
-          value,
+          number,
           style: const TextStyle(
-            fontSize: 20,
+            fontSize: 26,
             fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 5),
         Text(
           label,
           style: const TextStyle(
-            color: Colors.white60,
+            fontSize: 16,
+            color: Colors.white70,
           ),
         ),
       ],
@@ -2028,28 +2118,37 @@ class SavedPage extends StatelessWidget {
             AppData.instance.savedPosts,
         builder: (
           BuildContext context,
-          List<MediaPost> posts,
+          List<MediaPost> items,
           Widget? child,
         ) {
-          if (posts.isEmpty) {
+          if (items.isEmpty) {
             return const Center(
-              child: Text(
-                'अभी कोई saved post नहीं है।',
-                style: TextStyle(
-                  fontSize: 19,
-                ),
+              child: Column(
+                mainAxisAlignment:
+                    MainAxisAlignment.center,
+                children: <Widget>[
+                  Icon(
+                    Icons.bookmark_border,
+                    size: 70,
+                    color: Colors.white38,
+                  ),
+                  SizedBox(height: 15),
+                  Text(
+                    'अभी कोई saved post नहीं है',
+                  ),
+                ],
               ),
             );
           }
 
           return ListView.builder(
-            itemCount: posts.length,
+            itemCount: items.length,
             itemBuilder: (
               BuildContext context,
               int index,
             ) {
               return MediaPostCard(
-                post: posts[index],
+                post: items[index],
               );
             },
           );
@@ -2070,59 +2169,30 @@ class NotificationsPage
         title:
             const Text('Notifications'),
       ),
-      body: ListView(
-        children: const <Widget>[
-          ListTile(
-            leading: CircleAvatar(
-              child: Icon(Icons.favorite),
+      body: const Center(
+        child: Column(
+          mainAxisAlignment:
+              MainAxisAlignment.center,
+          children: <Widget>[
+            Icon(
+              Icons.notifications_none,
+              size: 70,
+              color: Colors.white38,
             ),
-            title: Text('Likes'),
-            subtitle: Text(
-              'आपकी पोस्ट के likes यहां दिखाई देंगे।',
+            SizedBox(height: 15),
+            Text(
+              'अभी कोई notification नहीं है',
             ),
-          ),
-          ListTile(
-            leading: CircleAvatar(
-              child: Icon(
-                Icons.person_add,
-              ),
-            ),
-            title: Text('Followers'),
-            subtitle: Text(
-              'नए followers की जानकारी यहां दिखाई देगी।',
-            ),
-          ),
-          ListTile(
-            leading: CircleAvatar(
-              child: Icon(
-                Icons.comment_outlined,
-              ),
-            ),
-            title: Text('Comments'),
-            subtitle: Text(
-              'आपकी पोस्ट के comments यहां दिखाई देंगे।',
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
 class SettingsPage
-    extends StatefulWidget {
+    extends StatelessWidget {
   const SettingsPage({super.key});
-
-  @override
-  State<SettingsPage> createState() =>
-      _SettingsPageState();
-}
-
-class _SettingsPageState
-    extends State<SettingsPage> {
-  bool dataSaver = false;
-  bool autoplay = true;
-  bool notifications = true;
 
   @override
   Widget build(BuildContext context) {
@@ -2132,88 +2202,33 @@ class _SettingsPageState
       ),
       body: ListView(
         children: <Widget>[
-          const ListTile(
-            leading:
-                Icon(Icons.account_circle_outlined),
-            title: Text('Account'),
-            subtitle: Text(
-              'Profile और account settings',
-            ),
-          ),
-          SwitchListTile(
-            secondary: const Icon(
-              Icons.data_saver_on_outlined,
-            ),
-            title: const Text(
-              'Data Saver',
-            ),
-            subtitle: const Text(
-              'वीडियो डेटा की खपत कम करें',
-            ),
-            value: dataSaver,
-            onChanged: (bool value) {
-              setState(() {
-                dataSaver = value;
-              });
-            },
-          ),
-          SwitchListTile(
-            secondary: const Icon(
-              Icons.play_circle_outline,
-            ),
-            title: const Text(
-              'Video Autoplay',
-            ),
-            subtitle: const Text(
-              'वीडियो अपने आप चलाएं',
-            ),
-            value: autoplay,
-            onChanged: (bool value) {
-              setState(() {
-                autoplay = value;
-              });
-            },
-          ),
-          SwitchListTile(
-            secondary: const Icon(
+          ListTile(
+            leading: const Icon(
               Icons.notifications_outlined,
             ),
-            title: const Text(
-              'Notifications',
-            ),
-            subtitle: const Text(
-              'App notifications',
-            ),
-            value: notifications,
-            onChanged: (bool value) {
-              setState(() {
-                notifications = value;
-              });
-            },
-          ),
-          const ListTile(
-            leading:
-                Icon(Icons.lock_outline),
-            title: Text('Privacy'),
-            subtitle: Text(
-              'Privacy और security',
-            ),
-          ),
-          const ListTile(
-            leading:
-                Icon(Icons.language),
-            title: Text('Language'),
-            subtitle: Text(
-              'Hindi / English',
+            title:
+                const Text('Notifications'),
+            trailing:
+                Switch(
+              value: true,
+              onChanged: (_) {},
             ),
           ),
           ListTile(
-            leading:
-                const Icon(Icons.info_outline),
+            leading: const Icon(
+              Icons.dark_mode_outlined,
+            ),
             title:
-                const Text('About Billi Billi'),
-            subtitle:
-                const Text('Version 1.0.0'),
+                const Text('Dark Mode'),
+            trailing:
+                const Icon(Icons.check),
+          ),
+          ListTile(
+            leading: const Icon(
+              Icons.info_outline,
+            ),
+            title:
+                const Text('About'),
             onTap: () {
               showAboutDialog(
                 context: context,
@@ -2221,8 +2236,6 @@ class _SettingsPageState
                     'Billi Billi',
                 applicationVersion:
                     '1.0.0',
-                applicationLegalese:
-                    'Billi Billi Video Sharing App',
               );
             },
           ),
