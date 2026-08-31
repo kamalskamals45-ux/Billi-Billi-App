@@ -49,12 +49,10 @@ class AppData {
       ValueNotifier<List<VideoPost>>(<VideoPost>[]);
 
   void addPost(String path) {
-    final List<VideoPost> updatedPosts = <VideoPost>[
+    posts.value = <VideoPost>[
       VideoPost(path: path),
       ...posts.value,
     ];
-
-    posts.value = updatedPosts;
   }
 
   void toggleLike(VideoPost post) {
@@ -66,12 +64,12 @@ class AppData {
       post.likes--;
     }
 
-    posts.notifyListeners();
+    posts.value = List<VideoPost>.from(posts.value);
   }
 
   void toggleSave(VideoPost post) {
     post.saved = !post.saved;
-    posts.notifyListeners();
+    posts.value = List<VideoPost>.from(posts.value);
   }
 }
 
@@ -444,6 +442,7 @@ class _VideoPostCardState extends State<VideoPostCard> {
                 AppData.instance.toggleLike(
                   widget.post,
                 );
+                setState(() {});
               },
               icon: Icon(
                 widget.post.liked
@@ -474,6 +473,7 @@ class _VideoPostCardState extends State<VideoPostCard> {
                 AppData.instance.toggleSave(
                   widget.post,
                 );
+                setState(() {});
               },
               icon: Icon(
                 widget.post.saved
@@ -779,19 +779,356 @@ class _CreatePageState extends State<CreatePage> {
                 ),
                 const SizedBox(height: 15),
                 SizedBox(
-  width: double.infinity,
-  height: 55,
-  child: FilledButton.icon(
-    onPressed: posting ? null : postVideo,
-    icon: const Icon(Icons.cloud_upload_outlined),
-    label: const Text('Post Video'),
-   ),
-  ),
-  ],
-  ),
-  ),
-  ),
-  ),
-);
+                  width: double.infinity,
+                  height: 55,
+                  child: FilledButton.icon(
+      onPressed:
+                        posting ? null : postVideo,
+                    icon: const Icon(
+                      Icons.cloud_upload_outlined,
+                    ),
+                    label: const Text(
+                      'Post Video',
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
+
+class ReelsPage extends StatelessWidget {
+  const ReelsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<List<VideoPost>>(
+      valueListenable: AppData.instance.posts,
+      builder: (
+        BuildContext context,
+        List<VideoPost> posts,
+        Widget? child,
+      ) {
+        if (posts.isEmpty) {
+          return const SafeArea(
+            child: Center(
+              child: Text(
+                'अभी कोई Reel नहीं है\nCreate से वीडियो पोस्ट करें',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 20),
+              ),
+            ),
+          );
+        }
+
+        return PageView.builder(
+          scrollDirection: Axis.vertical,
+          itemCount: posts.length,
+          itemBuilder: (
+            BuildContext context,
+            int index,
+          ) {
+            return ReelVideo(
+              post: posts[index],
+            );
+          },
+        );
+      },
+    );
+  }
 }
+
+class ReelVideo extends StatefulWidget {
+  final VideoPost post;
+
+  const ReelVideo({
+    super.key,
+    required this.post,
+  });
+
+  @override
+  State<ReelVideo> createState() => _ReelVideoState();
+}
+
+class _ReelVideoState extends State<ReelVideo> {
+  VideoPlayerController? controller;
+  bool loading = true;
+  bool error = false;
+
+  @override
+  void initState() {
+    super.initState();
+    initializeVideo();
+  }
+
+  Future<void> initializeVideo() async {
+    try {
+      final File file = File(widget.post.path);
+
+      if (!await file.exists()) {
+        if (!mounted) return;
+
+        setState(() {
+          loading = false;
+          error = true;
+        });
+
+        return;
+      }
+
+      final VideoPlayerController newController =
+          VideoPlayerController.file(file);
+
+      await newController.initialize();
+      await newController.setLooping(true);
+
+      if (!mounted) {
+        await newController.dispose();
+        return;
+      }
+
+      setState(() {
+        controller = newController;
+        loading = false;
+      });
+
+      await newController.play();
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        loading = false;
+        error = true;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final VideoPlayerController? videoController =
+        controller;
+
+    Widget background;
+
+    if (loading) {
+      background = const Center(
+        child: CircularProgressIndicator(),
+      );
+    } else if (error) {
+      background = const Center(
+        child: Text('वीडियो चल नहीं पाया'),
+      );
+    } else if (videoController != null &&
+        videoController.value.isInitialized) {
+      background = GestureDetector(
+        onTap: () {
+          setState(() {
+            if (videoController.value.isPlaying) {
+              videoController.pause();
+            } else {
+              videoController.play();
+            }
+          });
+        },
+        child: Center(
+          child: AspectRatio(
+            aspectRatio:
+                videoController.value.aspectRatio,
+            child: VideoPlayer(videoController),
+          ),
+        ),
+      );
+    } else {
+      background = const SizedBox.shrink();
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: <Widget>[
+        Container(
+          color: Colors.black,
+          child: background,
+        ),
+        Positioned(
+          left: 15,
+          right: 80,
+          bottom: 35,
+          child: Text(
+            '@billi_billi_user\nBilli Billi Reel',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              shadows: <Shadow>[
+                Shadow(
+                  blurRadius: 5,
+                  offset: Offset(1, 1),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Positioned(
+          right: 10,
+          bottom: 70,
+          child: Column(
+            children: <Widget>[
+              IconButton(
+                onPressed: () {
+                  AppData.instance.toggleLike(
+                    widget.post,
+                  );
+                  setState(() {});
+                },
+                iconSize: 36,
+                icon: Icon(
+                  widget.post.liked
+                      ? Icons.favorite
+                      : Icons.favorite_border,
+                  color: widget.post.liked
+                      ? Colors.red
+                      : Colors.white,
+                ),
+              ),
+              Text('${widget.post.likes}'),
+              const SizedBox(height: 15),
+              const Icon(
+                Icons.comment_outlined,
+                size: 32,
+              ),
+              const SizedBox(height: 20),
+              const Icon(
+                Icons.send_outlined,
+                size: 32,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class ProfilePage extends StatelessWidget {
+  const ProfilePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ValueListenableBuilder<List<VideoPost>>(
+        valueListenable: AppData.instance.posts,
+        builder: (
+          BuildContext context,
+          List<VideoPost> posts,
+          Widget? child,
+        ) {
+          return CustomScrollView(
+            slivers: <Widget>[
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    25,
+                    20,
+                    15,
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      CircleAvatar(
+                        radius: 42,
+                        child: Icon(
+                          Icons.person,
+                          size: 45,
+                        ),
+                      ),
+                      SizedBox(width: 20),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              'Billi Billi User',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight:
+                                    FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: 5),
+                            Text('India'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    'My Videos',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(
+                child: SizedBox(height: 10),
+              ),
+              if (posts.isEmpty)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Text(
+                      'अभी कोई वीडियो पोस्ट नहीं है',
+                    ),
+                  ),
+                )
+              else
+                SliverGrid(
+                  delegate:
+                      SliverChildBuilderDelegate(
+                    (
+                      BuildContext context,
+                      int index,
+                    ) {
+                      return Container(
+                        color: Colors.white12,
+                        child: const Center(
+                          child: Icon(
+                            Icons.video_library,
+                            size: 45,
+                          ),
+                        ),
+                      );
+                    },
+                    childCount: posts.length,
+                  ),
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 2,
+                    mainAxisSpacing: 2,
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+        );
+      }
+    }
