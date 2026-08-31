@@ -782,18 +782,5 @@ class _CreatePageState extends State<CreatePage> {
                   width: double.infinity,
                   height: 55,
                   child: FilledButton.icon(
-                    onPressed: posting
-                        ?
-null
-    : postVideo,
-icon: const Icon(Icons.cloud_upload_outlined),
-label: const Text('Post Video'),
-),
-),
-],
-),
-),
-),
-);
-}
-}
+                    onPressed: posting ? null : postVideo,
+     
