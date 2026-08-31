@@ -26,6 +26,55 @@ class BilliBilliApp extends StatelessWidget {
   }
 }
 
+class VideoPost {
+  final String path;
+  bool liked;
+  bool saved;
+  int likes;
+
+  VideoPost({
+    required this.path,
+    this.liked = false,
+    this.saved = false,
+    this.likes = 0,
+  });
+}
+
+class AppData {
+  AppData._();
+
+  static final AppData instance = AppData._();
+
+  final ValueNotifier<List<VideoPost>> posts =
+      ValueNotifier<List<VideoPost>>(<VideoPost>[]);
+
+  void addPost(String path) {
+    final List<VideoPost> updatedPosts = <VideoPost>[
+      VideoPost(path: path),
+      ...posts.value,
+    ];
+
+    posts.value = updatedPosts;
+  }
+
+  void toggleLike(VideoPost post) {
+    post.liked = !post.liked;
+
+    if (post.liked) {
+      post.likes++;
+    } else if (post.likes > 0) {
+      post.likes--;
+    }
+
+    posts.notifyListeners();
+  }
+
+  void toggleSave(VideoPost post) {
+    post.saved = !post.saved;
+    posts.notifyListeners();
+  }
+}
+
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -36,18 +85,36 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int currentIndex = 0;
 
-  static const List<Widget> pages = <Widget>[
-    HomePage(),
-    SearchPage(),
-    CreatePage(),
-    ReelsPage(),
-    ProfilePage(),
-  ];
+  late final List<Widget> pages;
+
+  @override
+  void initState() {
+    super.initState();
+
+    pages = <Widget>[
+      const HomePage(),
+      const SearchPage(),
+      CreatePage(
+        onPostComplete: () {
+          if (!mounted) return;
+
+          setState(() {
+            currentIndex = 0;
+          });
+        },
+      ),
+      const ReelsPage(),
+      const ProfilePage(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: pages[currentIndex],
+      body: IndexedStack(
+        index: currentIndex,
+        children: pages,
+      ),
       bottomNavigationBar: NavigationBar(
         backgroundColor: Colors.black,
         indicatorColor: Colors.white12,
@@ -57,7 +124,7 @@ class _MainScreenState extends State<MainScreen> {
             currentIndex = index;
           });
         },
-        destinations: const [
+        destinations: const <NavigationDestination>[
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
@@ -95,41 +162,96 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            backgroundColor: Colors.black,
-            floating: true,
-            title: const Text(
-              'Billi Billi',
-              style: TextStyle(
-                fontSize: 25,
-                fontWeight: FontWeight.bold,
+      child: ValueListenableBuilder<List<VideoPost>>(
+        valueListenable: AppData.instance.posts,
+        builder: (
+          BuildContext context,
+          List<VideoPost> posts,
+          Widget? child,
+        ) {
+          return CustomScrollView(
+            slivers: <Widget>[
+              SliverAppBar(
+                backgroundColor: Colors.black,
+                floating: true,
+                title: const Text(
+                  'Billi Billi',
+                  style: TextStyle(
+                    fontSize: 25,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                actions: <Widget>[
+                  IconButton(
+                    onPressed: () {},
+                    icon: const Icon(Icons.favorite_border),
+                  ),
+                  IconButton(
+                    onPressed: () {},
+                    icon: const Icon(
+                      Icons.chat_bubble_outline,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            actions: [
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.favorite_border),
+              const SliverToBoxAdapter(
+                child: StoriesSection(),
               ),
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.chat_bubble_outline),
-              ),
+              if (posts.isEmpty)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(30),
+                      child: Column(
+                        mainAxisAlignment:
+                            MainAxisAlignment.center,
+                        children: <Widget>[
+                          Icon(
+                            Icons.video_collection_outlined,
+                            size: 80,
+                            color: Colors.white38,
+                          ),
+                          SizedBox(height: 20),
+                          Text(
+                            'अभी कोई वीडियो पोस्ट नहीं है',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 21,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 10),
+                          Text(
+                            'Create में जाकर अपना पहला वीडियो पोस्ट करें',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white60,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+              else
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (
+                      BuildContext context,
+                      int index,
+                    ) {
+                      return VideoPostCard(
+                        post: posts[index],
+                      );
+                    },
+                    childCount: posts.length,
+                  ),
+                ),
             ],
-          ),
-          const SliverToBoxAdapter(
-            child: StoriesSection(),
-          ),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (BuildContext context, int index) {
-                return const PostCard();
-              },
-              childCount: 5,
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -146,23 +268,32 @@ class StoriesSection extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         itemCount: 8,
-        itemBuilder: (BuildContext context, int index) {
+        itemBuilder: (
+          BuildContext context,
+          int index,
+        ) {
           return Padding(
             padding: const EdgeInsets.only(right: 14),
             child: Column(
-              children: [
+              children: <Widget>[
                 CircleAvatar(
                   radius: 32,
                   backgroundColor: Colors.white24,
                   child: Text(
                     index == 0 ? '+' : '${index + 1}',
-                    style: const TextStyle(fontSize: 20),
+                    style: const TextStyle(
+                      fontSize: 20,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  index == 0 ? 'Your story' : 'User ${index + 1}',
-                  style: const TextStyle(fontSize: 11),
+                  index == 0
+                      ? 'Your story'
+                      : 'User ${index + 1}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                  ),
                 ),
               ],
             ),
@@ -173,79 +304,181 @@ class StoriesSection extends StatelessWidget {
   }
 }
 
-class PostCard extends StatefulWidget {
-  const PostCard({super.key});
+class VideoPostCard extends StatefulWidget {
+  final VideoPost post;
+
+  const VideoPostCard({
+    super.key,
+    required this.post,
+  });
 
   @override
-  State<PostCard> createState() => _PostCardState();
+  State<VideoPostCard> createState() =>
+      _VideoPostCardState();
 }
 
-class _PostCardState extends State<PostCard> {
-  bool liked = false;
-  bool saved = false;
+class _VideoPostCardState extends State<VideoPostCard> {
+  VideoPlayerController? controller;
+  bool loading = true;
+  bool error = false;
+
+  @override
+  void initState() {
+    super.initState();
+    initializeVideo();
+  }
+
+  Future<void> initializeVideo() async {
+    try {
+      final File file = File(widget.post.path);
+
+      if (!await file.exists()) {
+        if (!mounted) return;
+
+        setState(() {
+          loading = false;
+          error = true;
+        });
+
+        return;
+      }
+
+      final VideoPlayerController newController =
+          VideoPlayerController.file(file);
+
+      await newController.initialize();
+
+      if (!mounted) {
+        await newController.dispose();
+        return;
+      }
+
+      setState(() {
+        controller = newController;
+        loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        loading = false;
+        error = true;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    controller?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final VideoPlayerController? videoController =
+        controller;
+
+    Widget videoWidget;
+
+    if (loading) {
+      videoWidget = const SizedBox(
+        height: 350,
+        child: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    } else if (error) {
+      videoWidget = const SizedBox(
+        height: 350,
+        child: Center(
+          child: Text('वीडियो चल नहीं पाया'),
+        ),
+      );
+    } else if (videoController != null &&
+        videoController.value.isInitialized) {
+      videoWidget = AspectRatio(
+        aspectRatio: videoController.value.aspectRatio,
+        child: GestureDetector(
+          onTap: () {
+            setState(() {
+              if (videoController.value.isPlaying) {
+                videoController.pause();
+              } else {
+                videoController.play();
+              }
+            });
+          },
+          child: VideoPlayer(videoController),
+        ),
+      );
+    } else {
+      videoWidget = const SizedBox(
+        height: 350,
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ListTile(
-          leading: const CircleAvatar(
+      children: <Widget>[
+        const ListTile(
+          leading: CircleAvatar(
             child: Icon(Icons.person),
           ),
-          title: const Text(
+          title: Text(
             'Billi Billi User',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          subtitle: const Text('India'),
-          trailing: IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.more_vert),
-          ),
-        ),
-        AspectRatio(
-          aspectRatio: 1,
-          child: Container(
-            color: Colors.white10,
-            child: const Center(
-              child: Icon(
-                Icons.image_outlined,
-                size: 70,
-                color: Colors.white54,
-              ),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
             ),
           ),
+          subtitle: Text('India'),
+        ),
+        Container(
+          width: double.infinity,
+          color: Colors.black,
+          child: videoWidget,
         ),
         Row(
-          children: [
+          children: <Widget>[
             IconButton(
               onPressed: () {
-                setState(() {
-                  liked = !liked;
-                });
+                AppData.instance.toggleLike(
+                  widget.post,
+                );
               },
               icon: Icon(
-                liked ? Icons.favorite : Icons.favorite_border,
-                color: liked ? Colors.red : Colors.white,
+                widget.post.liked
+                    ? Icons.favorite
+                    : Icons.favorite_border,
+                color: widget.post.liked
+                    ? Colors.red
+                    : Colors.white,
+              ),
+            ),
+            if (widget.post.likes > 0)
+              Text('${widget.post.likes}'),
+            IconButton(
+              onPressed: () {},
+              icon: const Icon(
+                Icons.chat_bubble_outline,
               ),
             ),
             IconButton(
               onPressed: () {},
-              icon: const Icon(Icons.chat_bubble_outline),
-            ),
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(Icons.send_outlined),
+              icon: const Icon(
+                Icons.send_outlined,
+              ),
             ),
             const Spacer(),
             IconButton(
               onPressed: () {
-                setState(() {
-                  saved = !saved;
-                });
+                AppData.instance.toggleSave(
+                  widget.post,
+                );
               },
               icon: Icon(
-                saved ? Icons.bookmark : Icons.bookmark_border,
+                widget.post.saved
+                    ? Icons.bookmark
+                    : Icons.bookmark_border,
               ),
             ),
           ],
@@ -254,10 +487,12 @@ class _PostCardState extends State<PostCard> {
           padding: EdgeInsets.symmetric(horizontal: 15),
           child: Text(
             'Billi Billi community post',
-            style: TextStyle(fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
-        const SizedBox(height: 15),
+        const SizedBox(height: 20),
       ],
     );
   }
@@ -270,12 +505,13 @@ class SearchPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const SafeArea(
       child: Column(
-        children: [
+        children: <Widget>[
           Padding(
             padding: EdgeInsets.all(15),
             child: TextField(
               decoration: InputDecoration(
-                hintText: 'Search people, videos, hashtags...',
+                hintText:
+                    'Search people, videos, hashtags...',
                 prefixIcon: Icon(Icons.search),
                 border: OutlineInputBorder(),
               ),
@@ -285,7 +521,9 @@ class SearchPage extends StatelessWidget {
             child: Center(
               child: Text(
                 'Search Billi Billi',
-                style: TextStyle(fontSize: 22),
+                style: TextStyle(
+                  fontSize: 22,
+                ),
               ),
             ),
           ),
@@ -296,10 +534,16 @@ class SearchPage extends StatelessWidget {
 }
 
 class CreatePage extends StatefulWidget {
-  const CreatePage({super.key});
+  final VoidCallback onPostComplete;
+
+  const CreatePage({
+    super.key,
+    required this.onPostComplete,
+  });
 
   @override
-  State<CreatePage> createState() => _CreatePageState();
+  State<CreatePage> createState() =>
+      _CreatePageState();
 }
 
 class _CreatePageState extends State<CreatePage> {
@@ -307,29 +551,36 @@ class _CreatePageState extends State<CreatePage> {
 
   VideoPlayerController? controller;
   XFile? selectedVideo;
+
   bool loading = false;
+  bool posting = false;
 
   Future<void> pickVideo(ImageSource source) async {
-    if (loading) return;
+    if (loading || posting) return;
 
     setState(() {
       loading = true;
     });
 
     try {
-      final XFile? video = await picker.pickVideo(source: source);
+      final XFile? video = await picker.pickVideo(
+        source: source,
+      );
 
       if (video == null) {
-        if (mounted) {
-          setState(() {
-            loading = false;
-          });
-        }
+        if (!mounted) return;
+
+        setState(() {
+          loading = false;
+        });
+
         return;
       }
 
       final VideoPlayerController newController =
-          VideoPlayerController.file(File(video.path));
+          VideoPlayerController.file(
+        File(video.path),
+      );
 
       await newController.initialize();
 
@@ -356,10 +607,55 @@ class _CreatePageState extends State<CreatePage> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Video open नहीं हुआ: $e'),
+          content: Text(
+            'Video open नहीं हुआ: $e',
+          ),
         ),
       );
     }
+  }
+
+  void postVideo() {
+    final XFile? video = selectedVideo;
+
+    if (video == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'पहले वीडियो चुनें या रिकॉर्ड करें।',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (posting) return;
+
+    setState(() {
+      posting = true;
+    });
+
+    controller?.pause();
+
+    AppData.instance.addPost(video.path);
+
+    controller?.dispose();
+
+    setState(() {
+      controller = null;
+      selectedVideo = null;
+      posting = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'वीडियो सफलतापूर्वक पोस्ट हो गया ✅',
+        ),
+      ),
+    );
+
+    widget.onPostComplete();
   }
 
   @override
@@ -370,15 +666,15 @@ class _CreatePageState extends State<CreatePage> {
 
   @override
   Widget build(BuildContext context) {
-    final VideoPlayerController? videoController = controller;
+    final VideoPlayerController? videoController =
+        controller;
 
     return SafeArea(
       child: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(vertical: 20),
+          padding: const EdgeInsets.all(20),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
+            children: <Widget>[
               const Text(
                 'Create',
                 style: TextStyle(
@@ -402,14 +698,21 @@ class _CreatePageState extends State<CreatePage> {
               if (videoController != null &&
                   videoController.value.isInitialized)
                 Column(
-                  children: [
-                    AspectRatio(
-                      aspectRatio: videoController.value.aspectRatio,
-                      child: VideoPlayer(videoController),
+                  children: <Widget>[
+                    ClipRRect(
+                      borderRadius:
+                          BorderRadius.circular(12),
+                      child: AspectRatio(
+                        aspectRatio:
+                            videoController.value.aspectRatio,
+                        child: VideoPlayer(
+                          videoController,
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 10),
                     IconButton(
-                      iconSize: 50,
+                      iconSize: 55,
                       onPressed: () {
                         setState(() {
                           if (videoController.value.isPlaying) {
@@ -425,160 +728,59 @@ class _CreatePageState extends State<CreatePage> {
                             : Icons.play_circle,
                       ),
                     ),
-                    const SizedBox(height: 15),
+                    const SizedBox(height: 10),
                   ],
                 ),
-              ElevatedButton.icon(
-                onPressed: loading
-                    ? null
-                    : () => pickVideo(ImageSource.gallery),
-                icon: const Icon(Icons.photo_library_outlined),
-                label: const Text('Choose from Gallery'),
-              ),
-              const SizedBox(height: 15),
-              ElevatedButton.icon(
-                onPressed: loading
-                    ? null
-                    : () => pickVideo(ImageSource.camera),
-                icon: const Icon(Icons.camera_alt_outlined),
-                label: const Text('Open Camera'),
-              ),
-              if (selectedVideo != null)
-                const Padding(
-                  padding: EdgeInsets.all(15),
-                  child: Text(
-                    'Video selected successfully',
-                    style: TextStyle(
-                      color: Colors.greenAccent,
-                    ),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: loading || posting
+                      ? null
+                      : () {
+                          pickVideo(
+                            ImageSource.gallery,
+                          );
+                        },
+                  icon: const Icon(
+                    Icons.photo_library_outlined,
+                  ),
+                  label: const Text(
+                    'Choose from Gallery',
                   ),
                 ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class ReelsPage extends StatelessWidget {
-  const ReelsPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return PageView.builder(
-      scrollDirection: Axis.vertical,
-      itemCount: 5,
-      itemBuilder: (BuildContext context, int index) {
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            Container(
-              color: Colors.black,
-              child: const Center(
-                child: Icon(
-                  Icons.play_circle_outline,
-                  size: 80,
-                  color: Colors.white54,
+              ),
+              const SizedBox(height: 15),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: loading || posting
+                      ? null
+                      : () {
+                          pickVideo(
+                            ImageSource.camera,
+                          );
+                        },
+                  icon: const Icon(
+                    Icons.camera_alt_outlined,
+                  ),
+                  label: const Text(
+                    'Open Camera',
+                  ),
                 ),
               ),
-            ),
-            Positioned(
-              left: 15,
-              bottom: 30,
-              child: Text(
-                '@billi_billi_user\nReel ${index + 1}',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              if (selectedVideo != null) ...<Widget>[
+                const SizedBox(height: 20),
+                const Text(
+                  'Video selected successfully ✅',
+                  style: TextStyle(
+                    color: Colors.greenAccent,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ),
-            const Positioned(
-              right: 15,
-              bottom: 30,
-              child: Column(
-                children: [
-                  Icon(Icons.favorite_border, size: 32),
-                  SizedBox(height: 20),
-                  Icon(Icons.comment_outlined, size: 32),
-                  SizedBox(height: 20),
-                  Icon(Icons.send_outlined, size: 32),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(
-        children: [
-          const SizedBox(height: 25),
-          const CircleAvatar(
-            radius: 48,
-            child: Icon(Icons.person, size: 55),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Billi Billi User',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const Text('@billi_billi_user'),
-          const SizedBox(height: 20),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              ProfileStat(number: '0', label: 'Posts'),
-              ProfileStat(number: '0', label: 'Followers'),
-              ProfileStat(number: '0', label: 'Following'),
-            ],
-          ),
-          const SizedBox(height: 20),
-          OutlinedButton(
-            onPressed: () {},
-            child: const Text('Edit Profile'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class ProfileStat extends StatelessWidget {
-  final String number;
-  final String label;
-
-  const ProfileStat({
-    super.key,
-    required this.number,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          number,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(label),
-      ],
-    );
-  }
-}
+                const SizedBox(height: 15),
+                SizedBox(
+                  width: double.infinity,
+                  height: 55,
+                  child: FilledButton.icon(
+                    onPressed: posting
+                        ?
