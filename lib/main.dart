@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
@@ -35,7 +36,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int currentIndex = 0;
 
-  final List<Widget> pages = const [
+  static const List<Widget> pages = <Widget>[
     HomePage(),
     SearchPage(),
     CreatePage(),
@@ -51,7 +52,7 @@ class _MainScreenState extends State<MainScreen> {
         backgroundColor: Colors.black,
         indicatorColor: Colors.white12,
         selectedIndex: currentIndex,
-        onDestinationSelected: (index) {
+        onDestinationSelected: (int index) {
           setState(() {
             currentIndex = index;
           });
@@ -122,7 +123,7 @@ class HomePage extends StatelessWidget {
           ),
           SliverList(
             delegate: SliverChildBuilderDelegate(
-              (context, index) {
+              (BuildContext context, int index) {
                 return const PostCard();
               },
               childCount: 5,
@@ -145,7 +146,7 @@ class StoriesSection extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         itemCount: 8,
-        itemBuilder: (context, index) {
+        itemBuilder: (BuildContext context, int index) {
           return Padding(
             padding: const EdgeInsets.only(right: 14),
             child: Column(
@@ -267,10 +268,10 @@ class SearchPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
+    return const SafeArea(
       child: Column(
         children: [
-          const Padding(
+          Padding(
             padding: EdgeInsets.all(15),
             child: TextField(
               decoration: InputDecoration(
@@ -280,7 +281,7 @@ class SearchPage extends StatelessWidget {
               ),
             ),
           ),
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
                 'Search Billi Billi',
@@ -309,29 +310,35 @@ class _CreatePageState extends State<CreatePage> {
   bool loading = false;
 
   Future<void> pickVideo(ImageSource source) async {
-    try {
-      setState(() {
-        loading = true;
-      });
+    if (loading) return;
 
-      final XFile? video = await picker.pickVideo(
-        source: source,
-      );
+    setState(() {
+      loading = true;
+    });
+
+    try {
+      final XFile? video = await picker.pickVideo(source: source);
 
       if (video == null) {
-        setState(() {
-          loading = false;
-        });
+        if (mounted) {
+          setState(() {
+            loading = false;
+          });
+        }
         return;
       }
 
-      await controller?.dispose();
-
-      final newController = VideoPlayerController.file(
-        File(video.path),
-      );
+      final VideoPlayerController newController =
+          VideoPlayerController.file(File(video.path));
 
       await newController.initialize();
+
+      await controller?.dispose();
+
+      if (!mounted) {
+        await newController.dispose();
+        return;
+      }
 
       setState(() {
         selectedVideo = video;
@@ -341,11 +348,11 @@ class _CreatePageState extends State<CreatePage> {
 
       await newController.play();
     } catch (e) {
+      if (!mounted) return;
+
       setState(() {
         loading = false;
       });
-
-      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -363,11 +370,12 @@ class _CreatePageState extends State<CreatePage> {
 
   @override
   Widget build(BuildContext context) {
-    final videoController = controller;
+    final VideoPlayerController? videoController = controller;
 
     return SafeArea(
       child: Center(
         child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 20),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -378,14 +386,19 @@ class _CreatePageState extends State<CreatePage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              const SizedBox(height: 10),
+              const Text(
+                'अपना वीडियो Billi Billi पर बनाएं',
+                style: TextStyle(
+                  color: Colors.white70,
+                ),
+              ),
               const SizedBox(height: 25),
-
               if (loading)
                 const Padding(
-                  padding: EdgeInsets.all(20),
+                  padding: EdgeInsets.all(30),
                   child: CircularProgressIndicator(),
                 ),
-
               if (videoController != null &&
                   videoController.value.isInitialized)
                 Column(
@@ -415,32 +428,24 @@ class _CreatePageState extends State<CreatePage> {
                     const SizedBox(height: 15),
                   ],
                 ),
-
               ElevatedButton.icon(
-                onPressed: () {
-                  pickVideo(ImageSource.gallery);
-                },
-                icon: const Icon(
-                  Icons.photo_library_outlined,
-                ),
+                onPressed: loading
+                    ? null
+                    : () => pickVideo(ImageSource.gallery),
+                icon: const Icon(Icons.photo_library_outlined),
                 label: const Text('Choose from Gallery'),
               ),
-
               const SizedBox(height: 15),
-
               ElevatedButton.icon(
-                onPressed: () {
-                  pickVideo(ImageSource.camera);
-                },
-                icon: const Icon(
-                  Icons.camera_alt_outlined,
-                ),
+                onPressed: loading
+                    ? null
+                    : () => pickVideo(ImageSource.camera),
+                icon: const Icon(Icons.camera_alt_outlined),
                 label: const Text('Open Camera'),
               ),
-
               if (selectedVideo != null)
-                Padding(
-                  padding: const EdgeInsets.all(15),
+                const Padding(
+                  padding: EdgeInsets.all(15),
                   child: Text(
                     'Video selected successfully',
                     style: TextStyle(
@@ -464,7 +469,7 @@ class ReelsPage extends StatelessWidget {
     return PageView.builder(
       scrollDirection: Axis.vertical,
       itemCount: 5,
-      itemBuilder: (context, index) {
+      itemBuilder: (BuildContext context, int index) {
         return Stack(
           fit: StackFit.expand,
           children: [
