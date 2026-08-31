@@ -25,7 +25,12 @@ jobs:
         run: flutter --version
 
       - name: Create Android project
-        run: flutter create --platforms=android --project-name billi_billi_video --org com.billibilli .
+        run: |
+          flutter create \
+            --platforms=android \
+            --project-name billi_billi_video \
+            --org com.billibilli \
+            .
 
       - name: Configure Android permissions
         shell: bash
@@ -34,13 +39,28 @@ jobs:
           from pathlib import Path
 
           manifest = Path("android/app/src/main/AndroidManifest.xml")
+
+          if not manifest.exists():
+              raise SystemExit("AndroidManifest.xml not found")
+
           text = manifest.read_text(encoding="utf-8")
 
           marker = '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
 
+          if marker not in text:
+              raise SystemExit("Android manifest marker not found")
+
           permissions = [
-              '    <uses-permission android:name="android.permission.CAMERA" />',
               '    <uses-permission android:name="android.permission.INTERNET" />',
+              '    <uses-permission android:name="android.permission.CAMERA" />',
+              '    <uses-permission android:name="android.permission.RECORD_AUDIO" />',
+              '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />',
+              '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />',
+              '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />',
+              '    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />',
+              '    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />',
+              '    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />',
+              '    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />',
           ]
 
           for permission in permissions:
