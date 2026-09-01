@@ -369,7 +369,7 @@ class _MainScreenState extends State<MainScreen> {
         onDestinationSelected: (index) {
           setState(() => currentIndex = index);
         },
-        destinations: const [
+        destinations: [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
