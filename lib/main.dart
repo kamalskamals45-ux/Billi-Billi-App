@@ -1547,7 +1547,10 @@ class _ProfileTile extends StatelessWidget {
         File(post.path),
         fit: BoxFit.cover,
         errorBuilder: (_, __, ___) =>
-            const ColoredBox(child: Icon(Icons.broken_image)),
+            const ColoredBox(
+  color: Colors.transparent,
+  child: Icon(Icons.broken_image),
+),
       );
     }
 
@@ -1632,7 +1635,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final selected = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.grey.shade950,
+      backgroundColor: Colors.grey.shade900,
       builder: (sheetContext) {
         return SafeArea(
           child: SizedBox(
