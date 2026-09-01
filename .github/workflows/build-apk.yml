@@ -31,7 +31,31 @@ jobs:
             --project-name billi_billi_video \
             --org com.billibilli \
             .
+      - name: Set Billi Billi Logo
+        shell: bash
+        run: |
+          mkdir -p android/app/src/main/res/drawable-nodpi
+          cp billi_billi_app_logo_1024.png \
+            android/app/src/main/res/drawable-nodpi/billi_billi_logo.png
 
+          python3 - <<'PY'
+          from pathlib import Path
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+
+          if not manifest.exists():
+              raise SystemExit("AndroidManifest.xml not found")
+
+          text = manifest.read_text(encoding="utf-8")
+
+          text = text.replace(
+              'android:icon="@mipmap/ic_launcher"',
+              'android:icon="@drawable/billi_billi_logo"'
+          )
+
+          manifest.write_text(text, encoding="utf-8")
+          print("Billi Billi logo configured successfully")
+          PY
       - name: Configure Android permissions
         shell: bash
         run: |
