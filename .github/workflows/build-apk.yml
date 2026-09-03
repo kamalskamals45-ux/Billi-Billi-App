@@ -1,0 +1,135 @@
+name: Build Billi Billi APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.0'
+          channel: stable
+          cache: true
+
+      - name: Create Android platform
+        run: |
+          flutter create --platforms=android --project-name billi_billi_video --org com.billibilli .
+
+      - name: Configure Android package and permissions
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          old_package = "com.billibilli.billi_billi_video"
+          new_package = "com.billibilli.video"
+
+          for p in Path("android").rglob("*"):
+              if not p.is_file():
+                  continue
+              try:
+                  text = p.read_text(encoding="utf-8")
+              except (UnicodeDecodeError, OSError):
+                  continue
+              if old_package in text:
+                  p.write_text(text.replace(old_package, new_package), encoding="utf-8")
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          text = manifest.read_text(encoding="utf-8")
+
+          camera = '<uses-permission android:name="android.permission.CAMERA" />'
+          internet = '<uses-permission android:name="android.permission.INTERNET" />'
+          marker = '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
+
+          if camera not in text:
+              text = text.replace(marker, marker + "\n    " + camera + "\n    " + internet)
+          elif internet not in text:
+              text = text.replace(camera, camera + "\n    " + internet)
+
+          manifest.write_text(text, encoding="utf-8")
+
+          # Block cleartext HTTP traffic by default. Online API traffic should use HTTPS/TLS.
+          security_dir = Path("android/app/src/main/res/xml")
+          security_dir.mkdir(parents=True, exist_ok=True)
+          network_config = security_dir / "network_security_config.xml"
+          network_config.write_text("""<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>
+""", encoding="utf-8")
+
+          manifest_text = manifest.read_text(encoding="utf-8")
+          app_marker = "<application "
+          if "android:networkSecurityConfig=\"@xml/network_security_config\"" not in manifest_text:
+              manifest_text = manifest_text.replace(app_marker, app_marker + "android:networkSecurityConfig=\"@xml/network_security_config\" ", 1)
+          manifest.write_text(manifest_text, encoding="utf-8")
+          PY
+
+      - name: Configure Firebase Android app
+        shell: bash
+        run: |
+          test -f android/app/google-services.json
+          python3 - <<'PY2'
+          from pathlib import Path
+
+          settings = Path("android/settings.gradle.kts")
+          if settings.exists():
+              text = settings.read_text(encoding="utf-8")
+              plugin = 'id("com.google.gms.google-services") version "4.5.0" apply false'
+              if plugin not in text:
+                  marker = 'plugins {'
+                  text = text.replace(marker, marker + "\n    " + plugin, 1)
+              settings.write_text(text, encoding="utf-8")
+
+          app = Path("android/app/build.gradle.kts")
+          if app.exists():
+              text = app.read_text(encoding="utf-8")
+              plugin = 'id("com.google.gms.google-services")'
+              if plugin not in text:
+                  marker = 'plugins {'
+                  text = text.replace(marker, marker + "\n    " + plugin, 1)
+              app.write_text(text, encoding="utf-8")
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          if manifest.exists():
+              text = manifest.read_text(encoding="utf-8")
+              if 'android:name="android.permission.POST_NOTIFICATIONS"' not in text:
+                  marker = '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
+                  text = text.replace(marker, marker + '\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />', 1)
+              manifest.write_text(text, encoding="utf-8")
+          PY2
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze Dart code
+        run: flutter analyze --no-fatal-infos
+
+      - name: Build release APK
+        run: flutter build apk --release --obfuscate --split-debug-info=build/symbols
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Billi-Billi-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error

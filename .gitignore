@@ -1,0 +1,10 @@
+.dart_tool/
+build/
+.gradle/
+android/.gradle/
+android/local.properties
+.idea/
+*.iml
+.DS_Store
+*.apk
+*.aab

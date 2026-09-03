@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "444263535874",
+    "project_id": "billi-billi-video",
+    "storage_bucket": "billi-billi-video.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:444263535874:android:45ef79a5951cda2c285e1b",
+        "android_client_info": {
+          "package_name": "com.billibilli.video"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA_-bHOba3QcHD8kALexepvgaHHq8Fvhic"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
