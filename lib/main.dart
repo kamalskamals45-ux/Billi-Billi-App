@@ -1287,9 +1287,9 @@ class _PostHeader extends StatelessWidget {
                       onPressed: () async {
                         try {
                           if (isFollowing) {
-                            await AppData.instance.unfollow(ownerUid);
+                            await AppData.instance.toggleFollow(BilliUser(id: ownerUid, name: name, bio: bio));
                           } else {
-                            await AppData.instance.follow(ownerUid);
+                            await AppData.instance.toggleFollow(BilliUser(id: ownerUid, name: name, bio: bio));
                           }
                         } catch (_) {
                           if (context.mounted) {
