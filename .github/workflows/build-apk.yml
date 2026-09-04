@@ -119,6 +119,26 @@ jobs:
               manifest.write_text(text, encoding="utf-8")
           PY2
 
+
+      - name: Update Kotlin Gradle plugin
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path("android/settings.gradle.kts")
+          s = p.read_text()
+
+          s = re.sub(
+              r'(id\("org\.jetbrains\.kotlin\.android"\)\s+version\s+")([^"]+)(")',
+              r'\g<1>2.3.0\g<3>',
+              s,
+              count=1,
+          )
+
+
+
+          p.write_text(s)
       - name: Configure release signing
         env:
           BILLIBILLI_KEYSTORE_BASE64: ${{ secrets.BILLIBILLI_KEYSTORE_BASE64 }}
