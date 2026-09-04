@@ -33,6 +33,7 @@ jobs:
       - name: Create Android platform
         run: |
           flutter create --platforms=android --project-name billi_billi_video --org com.billibilli .
+                    rm -rf test
 
       - name: Configure Android package and permissions
         shell: bash
