@@ -3325,7 +3325,7 @@ class _SettingsPageState extends State<SettingsPage> {
           final item = AppSettings.countries[i]; final selected = item['code'] == AppSettings.instance.country.value;
           return ListTile(leading: const Icon(Icons.public), title: Text(item['native']!), subtitle: Text(item['name']!), trailing: selected ? const Icon(Icons.check_circle) : null, onTap: () => Navigator.pop(context, item['code']));
         })),
-      ])));
+      ]))),
     );
     if (code != null) await AppSettings.instance.setCountry(code);
   }
