@@ -445,7 +445,7 @@ class AppData {
       ValueNotifier<Map<String, List<ChatMessage>>>({});
 
   SharedPreferences? _prefs;
-  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  
   final OnlineSocialService online = OnlineSocialService();
 
   Future<void> init() async {
