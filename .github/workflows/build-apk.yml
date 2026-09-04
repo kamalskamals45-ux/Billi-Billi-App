@@ -119,6 +119,42 @@ jobs:
               manifest.write_text(text, encoding="utf-8")
           PY2
 
+      - name: Configure release signing
+        env:
+          BILLIBILLI_KEYSTORE_BASE64: ${{ secrets.BILLIBILLI_KEYSTORE_BASE64 }}
+          BILLIBILLI_KEYSTORE_PASSWORD: ${{ secrets.BILLIBILLI_KEYSTORE_PASSWORD }}
+        run: |
+          echo "$BILLIBILLI_KEYSTORE_BASE64" | base64 --decode > android/billibilli-release.jks
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("android/app/build.gradle.kts")
+          s = p.read_text()
+
+          signing_block = '''    signingConfigs {
+              create("release") {
+                  storeFile = rootProject.file("billibilli-release.jks")
+                  storePassword = System.getenv("BILLIBILLI_KEYSTORE_PASSWORD")
+                  keyAlias = "billibilli"
+                  keyPassword = System.getenv("BILLIBILLI_KEYSTORE_PASSWORD")
+              }
+          }
+          '''
+
+          if 'create("release")' not in s:
+              s = s.replace(
+                  '    buildTypes {',
+                  signing_block + '    buildTypes {',
+                  1
+              )
+
+          s = s.replace(
+              'signingConfig = signingConfigs.getByName("debug")',
+              'signingConfig = signingConfigs.getByName("release")'
+          )
+
+          p.write_text(s)
       - name: Get dependencies
         run: flutter pub get
 
