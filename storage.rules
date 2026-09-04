@@ -1,10 +1,41 @@
 rules_version = '2';
+
 service firebase.storage {
   match /b/{bucket}/o {
-    match /users/{uid}/{allPaths=**} {
+
+    match /users/{uid}/posts/{postId} {
+
+      // केवल logged-in users पोस्ट की media files पढ़ सकते हैं
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == uid
-                   && request.resource.size < 200 * 1024 * 1024;
+
+      // Upload केवल अपने UID वाले folder में
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 200 * 1024 * 1024
+        && request.resource.contentType in [
+          'video/mp4',
+          'image/jpeg',
+          'image/png'
+        ];
+
+      // Existing file को बदलना भी केवल owner कर सकता है
+      allow update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 200 * 1024 * 1024
+        && request.resource.contentType in [
+          'video/mp4',
+          'image/jpeg',
+          'image/png'
+        ];
+
+      // Delete केवल owner कर सकता है
+      allow delete: if request.auth != null
+        && request.auth.uid == uid;
     }
+
+    // बाकी सभी Storage paths बंद
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }    
   }
 }
