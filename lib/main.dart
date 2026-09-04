@@ -2126,7 +2126,7 @@ class _ShortVideoItemState extends State<ShortVideoItem> {
                     ),
                     IconButton(
                       onPressed: () async {
-                        await AppData.instance.addComment(widget.post, text: controller.text);
+                        await AppData.instance.addComment(widget.post);
                         if (mounted) setState(() {});
                       },
                       color: Colors.white,
