@@ -233,6 +233,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    await FirebaseAppCheck.instance.activate(
+  providerAndroid: const AndroidPlayIntegrityProvider(),
+);
   } catch (_) {
     // Keep the existing local Billi Billi experience available if Firebase
     // is temporarily unavailable or a service has not been enabled yet.
