@@ -182,6 +182,8 @@ jobs:
         run: flutter analyze --no-fatal-infos
 
       - name: Build release APK
+        env:
+          BILLIBILLI_KEYSTORE_PASSWORD: ${{ secrets.BILLIBILLI_KEYSTORE_PASSWORD }}
         run: flutter build apk --release --obfuscate --split-debug-info=build/symbols
 
       - name: Upload APK
