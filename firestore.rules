@@ -13,7 +13,8 @@ service cloud.firestore {
 
     function chatMember(chatId) {
       return signedIn()
-        && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.members;
+        && request.auth.uid in
+          get(/databases/$(database)/documents/chats/$(chatId)).data.members;
     }
 
     // User profiles
@@ -39,9 +40,19 @@ service cloud.firestore {
         allow create, delete: if self(followerUid) && followerUid != uid;
         allow update: if false;
       }
+
+      match /notifications/{notificationId} {
+        allow read: if self(uid);
+        allow create: if false;
+        allow update: if self(uid)
+          && request.resource.data.diff(resource.data)
+            .affectedKeys().hasOnly(['read'])
+          && request.resource.data.read is bool;
+        allow delete: if self(uid);
+      }
     }
 
-    // Private 1-to-1 chats. Members are immutable after creation.
+    // Chats
     match /chats/{chatId} {
       allow create: if signedIn()
         && request.resource.data.members is list
@@ -62,7 +73,7 @@ service cloud.firestore {
         allow create: if chatMember(chatId)
           && request.resource.data.senderId == request.auth.uid
           && request.resource.data.receiverId in
-             get(/databases/$(database)/documents/chats/$(chatId)).data.members
+            get(/databases/$(database)/documents/chats/$(chatId)).data.members
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 5000;
@@ -71,48 +82,49 @@ service cloud.firestore {
       }
     }
 
-
+    // Posts
     match /posts/{postId} {
       allow read: if signedIn();
+
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.mediaUrl is string
         && request.resource.data.mediaType in ['photo', 'video']
-        && request.resource.data.caption is string;
+        && request.resource.data.caption is string
+        && request.resource.data.caption.size() <= 5000;
+
+      // Post owner may edit caption only.
       allow update: if signedIn()
         && resource.data.ownerUid == request.auth.uid
-        && request.resource.data.ownerUid == resource.data.ownerUid;
-      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.diff(resource.data)
+          .affectedKeys().hasOnly(['caption'])
+        && request.resource.data.caption is string
+        && request.resource.data.caption.size() <= 5000;
+
+      allow delete: if signedIn()
+        && resource.data.ownerUid == request.auth.uid;
 
       match /likes/{userId} {
         allow read: if signedIn();
-        allow create, delete: if signedIn() && request.auth.uid == userId;
+        allow create, delete: if signedIn()
+          && request.auth.uid == userId;
         allow update: if false;
       }
 
       match /comments/{commentId} {
         allow read: if signedIn();
+
         allow create: if signedIn()
           && request.resource.data.ownerUid == request.auth.uid
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 1000;
+
         allow update, delete: if false;
       }
     }
 
-    // User notifications
-    match /users/{uid}/notifications/{notificationId} {
-      allow read: if self(uid);
-      // Notifications are created only by trusted backend code.
-      allow create: if false;
-      // The owner may only change the read flag.
-      allow update: if self(uid)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
-        && request.resource.data.read is bool;
-      allow delete: if self(uid);
-    }
-
-    // Everything else is blocked by default.
+    // Everything else is blocked.
   }
 }
