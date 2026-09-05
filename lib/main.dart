@@ -181,7 +181,7 @@ class AppSettings {
       );
     } catch (_) {
       return false;
-    }
+    } 
   }
 
   bool get isRtl => language.value == 'ar' || language.value == 'ur';
@@ -857,7 +857,7 @@ class _MainScreenState extends State<MainScreen> {
       ),
     ],
   ),
-),,
+),
     );
   }
 }
