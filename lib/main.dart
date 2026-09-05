@@ -820,41 +820,44 @@ class _MainScreenState extends State<MainScreen> {
 
     return Scaffold(
       body: IndexedStack(index: currentIndex, children: pages),
-      bottomNavigationBar: NavigationBar(
-        backgroundColor: Colors.black,
-        indicatorColor: Colors.white12,
-        selectedIndex: currentIndex,
-        onDestinationSelected: (index) {
-          setState(() => currentIndex = index);
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.search),
-            selectedIcon: Icon(Icons.search),
-            label: 'Search',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.add_circle_outline),
-            selectedIcon: Icon(Icons.add_circle),
-            label: 'Create',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.play_circle_outline),
-            selectedIcon: Icon(Icons.play_circle),
-            label: 'Reels',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+      bottomNavigationBar: SafeArea(
+  top: false,
+  child: NavigationBar(
+    backgroundColor: Colors.black,
+    indicatorColor: Colors.white12,
+    selectedIndex: currentIndex,
+    onDestinationSelected: (index) {
+      setState(() => currentIndex = index);
+    },
+    destinations: const [
+      NavigationDestination(
+        icon: Icon(Icons.home_outlined),
+        selectedIcon: Icon(Icons.home),
+        label: 'Home',
       ),
+      NavigationDestination(
+        icon: Icon(Icons.search),
+        selectedIcon: Icon(Icons.search),
+        label: 'Search',
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.add_circle_outline),
+        selectedIcon: Icon(Icons.add_circle),
+        label: 'Create',
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.play_circle_outline),
+        selectedIcon: Icon(Icons.play_circle),
+        label: 'Reels',
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.person_outline),
+        selectedIcon: Icon(Icons.person),
+        label: 'Profile',
+      ),
+    ],
+  ),
+),,
     );
   }
 }
