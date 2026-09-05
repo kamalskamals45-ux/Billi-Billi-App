@@ -820,7 +820,9 @@ class _MainScreenState extends State<MainScreen> {
 
     return Scaffold(
       body: IndexedStack(index: currentIndex, children: pages),
-      bottomNavigationBar: Container(
+      bottomNavigationBar: SafeArea(
+  top: false,
+  child: Container(
         height: 80,
         color: Colors.black,
         child: NavigationBar(
@@ -860,6 +862,7 @@ class _MainScreenState extends State<MainScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 }
