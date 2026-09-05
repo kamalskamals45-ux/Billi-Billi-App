@@ -820,9 +820,13 @@ class _MainScreenState extends State<MainScreen> {
 
     return Scaffold(
       body: IndexedStack(index: currentIndex, children: pages),
-      bottomNavigationBar: SafeArea(
-  top: false,
+bottomNavigationBar: Container(
+  color: Colors.black,
+  padding: EdgeInsets.only(
+    bottom: MediaQuery.of(context).viewPadding.bottom,
+  ),
   child: NavigationBar(
+    height: 70,
     backgroundColor: Colors.black,
     indicatorColor: Colors.white12,
     selectedIndex: currentIndex,
