@@ -84,7 +84,35 @@ jobs:
               manifest_text = manifest_text.replace(app_marker, app_marker + "android:networkSecurityConfig=\"@xml/network_security_config\" ", 1)
           manifest.write_text(manifest_text, encoding="utf-8")
           PY
+      - name: Fix Android 15 edge-to-edge theme
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
 
+          base = Path("android/app/src/main/res")
+          attr = '<item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>'
+
+          for folder in ("values", "values-night"):
+              path = base / folder / "styles.xml"
+              if not path.exists():
+                  continue
+
+              text = path.read_text(encoding="utf-8")
+
+              for theme in ("LaunchTheme", "NormalTheme"):
+                  pattern = rf'(<style[^>]*name="{theme}"[^>]*>.*?)(</style>)'
+                  match = re.search(pattern, text, re.DOTALL)
+
+                  if match and attr not in match.group(1):
+                      replacement = match.group(1) + f"        {attr}\n    " + match.group(2)
+                      text = text[:match.start()] + replacement + text[match.end():]
+
+              path.write_text(text, encoding="utf-8")
+
+          print("Android 15 edge-to-edge theme fix applied.")
+          PY
       - name: Configure Firebase Android app
         shell: bash
         run: |
