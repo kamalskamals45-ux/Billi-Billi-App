@@ -30,10 +30,11 @@ jobs:
           channel: stable
           cache: true
           
-      - name: Backup Billi Billi source
+      - name: Create Android platform
         run: |
-          cp -a lib /tmp/billi_billi_lib
-
+          flutter create --platforms=android --project-name billi_billi_video --org com.billibilli .
+          rm -rf test
+          git checkout -- lib
       - name: Create Android platform
         run: |
           flutter create --platforms=android --project-name billi_billi_video --org com.billibilli .
