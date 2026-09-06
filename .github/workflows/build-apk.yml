@@ -113,6 +113,18 @@ jobs:
 
           print("Android 15 edge-to-edge theme fix applied.")
           PY
+      - name: Configure Billi Billi launcher logo
+        shell: bash
+        run: |
+          mkdir -p android/app/src/main/res/drawable
+          cp assets/billi_billi_logo.png android/app/src/main/res/drawable/billi_billi_logo.png
+          python3 - <<'PY3'
+          from pathlib import Path
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          text = manifest.read_text(encoding="utf-8")
+          text = text.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/billi_billi_logo"')
+          manifest.write_text(text, encoding="utf-8")
+          PY3
       - name: Configure Firebase Android app
         shell: bash
         run: |
