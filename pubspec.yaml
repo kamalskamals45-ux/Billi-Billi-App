@@ -1,7 +1,7 @@
 name: billi_billi_video
 description: Billi Billi video sharing app.
 publish_to: "none"
-version: 1.11.0+22
+version: 1.11.1+23
 
 environment:
   sdk: ">=3.5.0 <4.0.0"
