@@ -29,11 +29,20 @@ jobs:
           flutter-version: '3.47.0'
           channel: stable
           cache: true
+          
+      - name: Backup Billi Billi source
+        run: |
+          cp -a lib /tmp/billi_billi_lib
 
       - name: Create Android platform
         run: |
           flutter create --platforms=android --project-name billi_billi_video --org com.billibilli .
-                    rm -rf test
+          rm -rf test
+
+      - name: Restore Billi Billi source
+        run: |
+          rm -rf lib
+          cp -a /tmp/billi_billi_lib lib
 
       - name: Configure Android package and permissions
         shell: bash
