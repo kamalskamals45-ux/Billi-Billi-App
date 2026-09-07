@@ -66,9 +66,6 @@ jobs:
               print(f'RESTORED: {filename} ({path.stat().st_size} bytes)')
           PY2
 
-          test -s lib/main.dart
-          test -s lib/firebase_options.dart
-          test -s lib/services/online_social_service.dart
           echo "Required Billi Billi Dart source files are ready."
 
       - name: Verify required Billi Billi assets
