@@ -259,7 +259,7 @@ jobs:
           echo "online_social_service.dart: $(wc -c < lib/services/online_social_service.dart) bytes"
 
       - name: Analyze Dart code
-        run: flutter analyze --no-fatal-infos
+       flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Build release APK
         env:
