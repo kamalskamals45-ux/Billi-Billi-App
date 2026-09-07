@@ -47,7 +47,7 @@ jobs:
         shell: bash
         run: |
           rm -rf lib
-          cp -a /tmp/billi_billi_lib_backup lib
+          cp -a /tmp/billi_billi_lib_backup/. lib/
 
           # Older GitHub commits of this project omitted these two source files.
           # Restore the known-good copies so flutter analyze cannot fail with
