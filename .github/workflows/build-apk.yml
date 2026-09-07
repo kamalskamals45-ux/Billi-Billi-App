@@ -144,7 +144,7 @@ jobs:
           import re
 
           base = Path("android/app/src/main/res")
-
+          attr = '<item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>'
           for folder in ("values", "values-night"):
               path = base / folder / "styles.xml"
               if not path.exists():
